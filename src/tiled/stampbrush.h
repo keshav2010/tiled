@@ -49,7 +49,7 @@ class StampBrush : public AbstractTileTool
 
 public:
     StampBrush(QObject *parent = nullptr);
-    ~StampBrush();
+    ~StampBrush() override;
 
     void deactivate(MapScene *scene) override;
 
@@ -148,7 +148,7 @@ private:
     QPoint mStampReference;
 
     bool mIsRandom;
-    RandomPicker<Cell, float> mRandomCellPicker;
+    RandomPicker<Cell> mRandomCellPicker;
 
     bool mIsWangFill;
     WangSet *mWangSet;

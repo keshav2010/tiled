@@ -50,6 +50,8 @@
 #include <QUndoStack>
 #include <QMenu>
 
+#include "qtcompat_p.h"
+
 #include <cmath>
 #include <float.h>
 
@@ -245,9 +247,9 @@ class ResizeHandle : public Handle
 public:
     ResizeHandle(AnchorPosition anchorPosition, QGraphicsItem *parent = nullptr)
         : Handle(parent)
-        , mAnchorPosition(anchorPosition)
         , mResizingLimitHorizontal(false)
         , mResizingLimitVertical(false)
+        , mAnchorPosition(anchorPosition)
         , mArrow(createResizeArrow(anchorPosition > BottomRightAnchor))
     {
         // The bottom right anchor takes precedence
@@ -282,10 +284,10 @@ public:
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *) override;
 
 private:
-    AnchorPosition mAnchorPosition;
-    QPointF mResizingOrigin;
     bool mResizingLimitHorizontal;
     bool mResizingLimitVertical;
+    AnchorPosition mAnchorPosition;
+    QPointF mResizingOrigin;
     QPainterPath mArrow;
 };
 
@@ -1081,7 +1083,7 @@ void ObjectSelectionTool::startMoving(const QPointF &pos,
     mAlignPosition = mMovingObjects.first().oldPosition;
     mOldOriginPosition = mOriginIndicator->pos();
 
-    foreach (const MovingObject &object, mMovingObjects) {
+    for (const MovingObject &object : qAsConst(mMovingObjects)) {
         const QPointF &pos = object.oldPosition;
         if (pos.x() < mAlignPosition.x())
             mAlignPosition.setX(pos.x());
@@ -1098,7 +1100,7 @@ void ObjectSelectionTool::updateMovingItems(const QPointF &pos,
     const MapRenderer *renderer = mapDocument()->renderer();
     const QPointF diff = snapToGrid(pos - mStart, modifiers);
 
-    foreach (const MovingObject &object, mMovingObjects) {
+    for (const MovingObject &object : qAsConst(mMovingObjects)) {
         const QPointF newPixelPos = object.oldScreenPosition + diff;
         const QPointF newPos = renderer->screenToPixelCoords(newPixelPos);
 
@@ -1121,7 +1123,7 @@ void ObjectSelectionTool::finishMoving(const QPointF &pos)
 
     QUndoStack *undoStack = mapDocument()->undoStack();
     undoStack->beginMacro(tr("Move %n Object(s)", "", mMovingObjects.size()));
-    foreach (const MovingObject &object, mMovingObjects) {
+    for (const MovingObject &object : qAsConst(mMovingObjects)) {
         undoStack->push(new MoveMapObject(mapDocument(),
                                           object.mapObject,
                                           object.oldPosition));

@@ -30,6 +30,7 @@
 
 class QAction;
 class QComboBox;
+class QLabel;
 class QMainWindow;
 class QStackedWidget;
 class QToolBar;
@@ -112,6 +113,7 @@ private slots:
     void currentTerrainChanged(const Terrain *terrain);
 
     void setEditCollision(bool editCollision);
+    void hasSelectedCollisionObjectsChanged();
 
     void setEditWang(bool editWang);
 
@@ -152,6 +154,7 @@ private:
     TileCollisionDock *mTileCollisionDock;
     WangDock *mWangDock;
     QComboBox *mZoomComboBox;
+    QLabel *mStatusInfoLabel;
     TileAnimationEditor *mTileAnimationEditor;
 
     QHash<TilesetDocument*, TilesetView*> mViewForTileset;

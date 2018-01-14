@@ -80,9 +80,9 @@ void MapRenderer::drawPointObject(QPainter *painter, const QColor &color) const
 
     QPainterPath path;
 
-    const float radius = 10.f;
-    const float sweep = 235.f;
-    const float startAngle = 90.f - sweep / 2;
+    const qreal radius = 10.0;
+    const qreal sweep = 235.0;
+    const qreal startAngle = 90.0 - sweep / 2;
     QRectF rectangle(-radius, -radius, radius * 2, radius * 2);
     path.moveTo(radius * cos(startAngle * M_PI / 180.0), -radius * sin(startAngle * M_PI / 180.0));
     path.arcTo(rectangle, startAngle, sweep);
@@ -101,7 +101,7 @@ void MapRenderer::drawPointObject(QPainter *painter, const QColor &color) const
 
     const QBrush opaqueBrush(color);
     painter->setBrush(opaqueBrush);
-    const float smallRadius = radius / 3;
+    const qreal smallRadius = radius / 3.0;
     painter->drawEllipse(-smallRadius, -smallRadius, smallRadius * 2, smallRadius * 2);
 }
 
@@ -220,7 +220,9 @@ void CellRenderer::render(const Cell &cell, const QPointF &pos, const QSizeF &si
         return;
     }
 
-    if (mTile != tile)
+    // The USHRT_MAX limit is rather arbitrary but avoids a crash in
+    // drawPixmapFragments for a large number of fragments.
+    if (mTile != tile || mFragments.size() == USHRT_MAX)
         flush();
 
     const QPixmap &image = tile->image();
