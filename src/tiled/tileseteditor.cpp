@@ -213,8 +213,6 @@ TilesetEditor::TilesetEditor(QObject *parent)
 
     resetLayout();
 
-    resetLayout();
-
     connect(mMainWindow, &TilesetEditorWindow::urlsDropped, this, &TilesetEditor::addTiles);
 
     connect(mWidgetStack, &QStackedWidget::currentChanged, this, &TilesetEditor::currentWidgetChanged);
