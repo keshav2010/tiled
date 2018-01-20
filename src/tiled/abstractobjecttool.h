@@ -62,7 +62,7 @@ protected:
      * an object group.
      */
     void updateEnabledState() override;
-
+    QString mtoolInfo;
     MapScene *mapScene() const { return mMapScene; }
     ObjectGroup *currentObjectGroup() const;
     QList<MapObjectItem*> objectItemsAt(const QPointF &pos) const;
@@ -89,7 +89,6 @@ private slots:
 private:
     void showContextMenu(MapObjectItem *clickedObject,
                          QPoint screenPos);
-
     MapScene *mMapScene;
 };
 
