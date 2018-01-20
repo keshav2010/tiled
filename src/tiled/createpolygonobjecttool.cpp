@@ -53,7 +53,7 @@ MapObject *CreatePolygonObjectTool::createNewMapObject()
 void CreatePolygonObjectTool::finishNewMapObject()
 {
     if (mNewMapObjectItem->mapObject()->polygon().size() >= 3)
-        CreateObjectTool::finishNewMapObject();
+        CreateMultipointObjectTool::finishNewMapObject();
     else
-        CreateObjectTool::cancelNewMapObject();
+        CreateMultipointObjectTool::cancelNewMapObject();
 }
