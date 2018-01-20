@@ -34,6 +34,7 @@ CreatePolylineObjectTool::CreatePolylineObjectTool(QObject *parent)
     QIcon icon(QLatin1String(":images/24x24/insert-polyline.png"));
     icon.addFile(QLatin1String(":images/48x48/insert-polyline.png"));
     setIcon(icon);
+    mtoolInfo = tr("<b>First Click</b> determines the location of object and first point of polyline. <b>Right Click</b> or press <b>Enter</b> to finish creating polyline. press <b>Escape</b> to cancel creation of polyline.");
     languageChanged();
 }
 
