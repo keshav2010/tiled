@@ -226,12 +226,16 @@ void TilesetModel::tileChanged(Tile *tile)
 
 void TilesetModel::refreshTileIds()
 {
+    bool collection = mTileset->isCollection();
     mTileNames.clear();
     mTileIds.clear();
     for (Tile *tile : mTileset->tiles()){
-        mTileNames[tile->name()] = tile->id();
+        if(collection)
+            mTileNames[tile->name()] = tile->id();
+        else mTileIds.append(tile->id());
     }
-    for(QMap<QString, int>::iterator itr=mTileNames.begin(); itr!= mTileNames.end(); itr++){
-        mTileIds.append(itr.value());
-    }
+    if(collection)
+        for(QMap<QString, int>::iterator itr=mTileNames.begin(); itr!= mTileNames.end(); itr++){
+            mTileIds.append(itr.value());
+        }
 }
