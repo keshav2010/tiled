@@ -30,7 +30,6 @@
 
 #include "objectgroup.h"
 #include "tileset.h"
-
 using namespace Tiled;
 
 Tile::Tile(int id, Tileset *tileset):
@@ -43,7 +42,9 @@ Tile::Tile(int id, Tileset *tileset):
     mObjectGroup(nullptr),
     mCurrentFrameIndex(0),
     mUnusedTime(0)
-{}
+{
+    mName = QString::number(mId); //deleteMe
+}
 
 Tile::Tile(const QPixmap &image, int id, Tileset *tileset):
     Object(TileType),
@@ -56,7 +57,9 @@ Tile::Tile(const QPixmap &image, int id, Tileset *tileset):
     mObjectGroup(nullptr),
     mCurrentFrameIndex(0),
     mUnusedTime(0)
-{}
+{
+    mName = QString::number(mId); //deleteMe
+}
 
 Tile::~Tile()
 {
@@ -207,6 +210,8 @@ Tile *Tile::clone(Tileset *tileset) const
     c->mImageSource = mImageSource;
     c->mTerrain = mTerrain;
     c->mProbability = mProbability;
+
+    c->mName = mImageSource.fileName();//deleteMe
 
     if (mObjectGroup)
         c->mObjectGroup = mObjectGroup->clone();

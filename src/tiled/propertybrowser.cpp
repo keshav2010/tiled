@@ -814,6 +814,8 @@ void PropertyBrowser::addTilesetProperties()
 void PropertyBrowser::addTileProperties()
 {
     QtProperty *groupProperty = mGroupManager->addProperty(tr("Tile"));
+
+    addProperty(NameProperty, QVariant::String, tr("Name"), groupProperty)->setEnabled(false);
     addProperty(IdProperty, QVariant::Int, tr("ID"), groupProperty)->setEnabled(false);
 
     QtVariantProperty *typeProperty =
@@ -1659,6 +1661,7 @@ void PropertyBrowser::updateProperties()
     case Object::TileType: {
         const Tile *tile = static_cast<const Tile*>(mObject);
         const QSize tileSize = tile->size();
+        mIdToProperty[NameProperty]->setValue(tile->name());//deleteMe
         mIdToProperty[IdProperty]->setValue(tile->id());
         mIdToProperty[TypeProperty]->setValue(tile->type());
         mIdToProperty[WidthProperty]->setValue(tileSize.width());

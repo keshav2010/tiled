@@ -99,6 +99,7 @@ public:
     ~Tile();
 
     int id() const;
+    const QString &name() const;
 
     Tileset *tileset() const;
     QSharedPointer<Tileset> sharedTileset() const;
@@ -148,6 +149,8 @@ public:
     Tile *clone(Tileset *tileset) const;
 
 private:
+    QString mName;
+
     int mId;
     Tileset *mTileset;
     QPixmap mImage;
@@ -165,6 +168,13 @@ private:
     friend class Tileset; // To allow changing the tile id
 };
 
+/**
+ * Returns NAME of this tile within its tileset
+ */
+inline const QString &Tile::name() const
+{
+    return mName;
+}
 /**
  * Returns ID of this tile within its tileset.
  */
@@ -211,6 +221,7 @@ inline const QUrl &Tile::imageSource() const
 inline void Tile::setImageSource(const QUrl &imageSource)
 {
     mImageSource = imageSource;
+    mName = mImageSource.fileName();//deleteMe
 }
 
 /**
