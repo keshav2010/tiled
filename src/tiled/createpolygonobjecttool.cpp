@@ -62,15 +62,12 @@ CreatePolygonObjectTool::CreatePolygonObjectTool(QObject *parent)
     QIcon icon(QLatin1String(":images/24x24/insert-polygon.png"));
     icon.addFile(QLatin1String(":images/48x48/insert-polygon.png"));
     setIcon(icon);
-<<<<<<< HEAD
-    mtoolInfo = tr("<b>First Click</b> determines the location of object and first point of polygon. <b>Right Click</b> or press <b>Enter</b> to finish creating polygon. press <b>Escape</b> to cancel creation of polygon.");
-=======
-<<<<<<< HEAD
 
-=======
-    mtoolInfo = tr("<b>First Click</b> determines the location of object and first point of polygon. <b>Right Click</b> or press <b>Enter</b> to finish creating polygon. press <b>Escape</b> to cancel creation of polygon.");
->>>>>>> 7b9ddd1b... added information to be displayed in status bar for object-tools, except not for template object tool
->>>>>>> 5c5b2e7ac068a497b110c33f3bc471dd8e7af332
+    mToolInfo = tr("<b>First Click</b> determines the location of object and first point of polygon. <b>Right Click</b> or press <b>Enter</b> to finish creating polygon. press <b>Escape</b> to cancel creation of polygon.");
+
+
+    mToolInfo = tr("<b>First Click</b> determines the location of object and first point of polygon. <b>Right Click</b> or press <b>Enter</b> to finish creating polygon. press <b>Escape</b> to cancel creation of polygon.");
+
     languageChanged();
 }
 
