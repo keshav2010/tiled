@@ -20,7 +20,6 @@
 
 #include "createpolylineobjecttool.h"
 
-#include "mapdocument.h"
 #include "mapobject.h"
 #include "mapobjectitem.h"
 #include "utils.h"
@@ -44,39 +43,6 @@ void CreatePolylineObjectTool::languageChanged()
     setShortcut(QKeySequence(tr("L")));
 }
 
-/**
- * Starts extending the given polyline \a mapObject.
- *
- * \a extendingFirst determines whether it should extend from the first or
- * the last point of the polyline.
- */
-void CreatePolylineObjectTool::extend(MapObject *mapObject, bool extendingFirst)
-{
-    Q_ASSERT(mapObject->shape() == MapObject::Polyline);
-
-    mExtending = true;
-    mExtendingFirst = extendingFirst;
-
-    mNewMapObjectItem = new MapObjectItem(mapObject, mapDocument(), mObjectGroupItem);
-
-    QPolygonF next = mapObject->polygon();
-
-    if (extendingFirst)
-        next.prepend(next.first());
-    else
-        next.append(next.last());
-
-    mOverlayPolygonObject->setPolygon(next);
-    mOverlayPolygonObject->setShape(mapObject->shape());
-    mOverlayPolygonObject->setPosition(mapObject->position());
-
-    mOverlayPolygonItem = new MapObjectItem(mOverlayPolygonObject,
-                                            mapDocument(),
-                                            mObjectGroupItem);
-
-    mapDocument()->setSelectedObjects(QList<MapObject*>());
-}
-
 MapObject *CreatePolylineObjectTool::createNewMapObject()
 {
     MapObject *newMapObject = new MapObject;
@@ -87,7 +53,7 @@ MapObject *CreatePolylineObjectTool::createNewMapObject()
 void CreatePolylineObjectTool::finishNewMapObject()
 {
     if (mNewMapObjectItem->mapObject()->polygon().size() >= 2)
-        CreateMultipointObjectTool::finishNewMapObject();
+        CreateObjectTool::finishNewMapObject();
     else
-        CreateMultipointObjectTool::cancelNewMapObject();
+        CreateObjectTool::cancelNewMapObject();
 }

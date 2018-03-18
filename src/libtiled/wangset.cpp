@@ -393,7 +393,7 @@ void WangSet::setCornerColorCount(int n)
     }
 }
 
-void WangSet::insertWangColor(QSharedPointer<WangColor> wangColor)
+void WangSet::insertWangColor(const QSharedPointer<WangColor> &wangColor)
 {
     if (wangColor->isEdge())
         insertEdgeWangColor(wangColor);
@@ -402,7 +402,7 @@ void WangSet::insertWangColor(QSharedPointer<WangColor> wangColor)
 }
 
 
-void WangSet::addWangColor(QSharedPointer<WangColor> wangColor)
+void WangSet::addWangColor(const QSharedPointer<WangColor> &wangColor)
 {
     if (wangColor->isEdge()) {
         wangColor->setColorIndex(mEdgeColors.size() + 1);
@@ -413,7 +413,7 @@ void WangSet::addWangColor(QSharedPointer<WangColor> wangColor)
     }
 }
 
-void WangSet::insertEdgeWangColor(QSharedPointer<WangColor> wangColor)
+void WangSet::insertEdgeWangColor(const QSharedPointer<WangColor> &wangColor)
 {
     Q_ASSERT(edgeColorCount() + 1 >= wangColor->colorIndex());
 
@@ -423,7 +423,7 @@ void WangSet::insertEdgeWangColor(QSharedPointer<WangColor> wangColor)
         mEdgeColors.at(i)->setColorIndex(i + 1);
 }
 
-void WangSet::insertCornerWangColor(QSharedPointer<WangColor> wangColor)
+void WangSet::insertCornerWangColor(const QSharedPointer<WangColor> &wangColor)
 {
     Q_ASSERT(cornerColorCount() + 1 >= wangColor->colorIndex());
 
@@ -461,14 +461,14 @@ void WangSet::removeCornerWangColor(int color)
         mCornerColors.at(i)->setColorIndex(i + 1);
 }
 
-QSharedPointer<WangColor> WangSet::edgeColorAt(int index) const
+const QSharedPointer<WangColor> &WangSet::edgeColorAt(int index) const
 {
     Q_ASSERT(index > 0 && index <= edgeColorCount());
 
     return mEdgeColors.at(index - 1);
 }
 
-QSharedPointer<WangColor> WangSet::cornerColorAt(int index) const
+const QSharedPointer<WangColor> &WangSet::cornerColorAt(int index) const
 {
     Q_ASSERT(index > 0 && index <= cornerColorCount());
 
@@ -783,10 +783,16 @@ WangId WangSet::templateWangIdAt(unsigned n) const
 
 WangSet *WangSet::clone(Tileset *tileset) const
 {
-    WangSet *c = new WangSet(tileset, mName, mImageTileId);
+    WangSet *c = new WangSet(*this);
 
-    c->mWangIdToWangTile = mWangIdToWangTile;
-    c->mTileInfoToWangId = mTileInfoToWangId;
+    // Caller is responsible for adding the WangSet to this tileset
+    c->setTileset(tileset);
+
+    // Avoid sharing wang colors
+    for (QSharedPointer<WangColor> &wangColor : c->mEdgeColors)
+        wangColor.reset(new WangColor(*wangColor));
+    for (QSharedPointer<WangColor> &wangColor : c->mCornerColors)
+        wangColor.reset(new WangColor(*wangColor));
 
     return c;
 }

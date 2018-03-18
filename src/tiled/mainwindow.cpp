@@ -218,7 +218,9 @@ MainWindow::MainWindow(QWidget *parent, Qt::WindowFlags flags)
     MacSupport::addFullscreen(this);
 #endif
 
+#if QT_VERSION >= 0x050600
     setDockOptions(dockOptions() | QMainWindow::GroupedDragging);
+#endif
 
     Preferences *preferences = Preferences::instance();
 
@@ -245,7 +247,6 @@ MainWindow::MainWindow(QWidget *parent, Qt::WindowFlags flags)
     mUi->actionNewMap->setShortcuts(QKeySequence::New);
     mUi->actionOpen->setShortcuts(QKeySequence::Open);
     mUi->actionSave->setShortcuts(QKeySequence::Save);
-    mUi->actionSaveAs->setShortcuts(QKeySequence::SaveAs);
     mUi->actionClose->setShortcuts(QKeySequence::Close);
     mUi->actionQuit->setShortcuts(QKeySequence::Quit);
     mUi->actionCut->setShortcuts(QKeySequence::Cut);
@@ -357,6 +358,7 @@ MainWindow::MainWindow(QWidget *parent, Qt::WindowFlags flags)
     mLayerMenu->addAction(mActionHandler->actionMoveLayerDown());
     mLayerMenu->addSeparator();
     mLayerMenu->addAction(mActionHandler->actionToggleOtherLayers());
+    mLayerMenu->addAction(mActionHandler->actionToggleLockOtherLayers());
     mLayerMenu->addSeparator();
     mLayerMenu->addAction(mActionHandler->actionLayerProperties());
 
@@ -1106,9 +1108,9 @@ void MainWindow::reloadTilesetImages()
         Map *map = mapDocument->map();
         const auto tilesets = map->tilesets();
         for (const SharedTileset &tileset : tilesets)
-            tilesetManager->reloadImages(tileset);
+            tilesetManager->reloadImages(tileset.data());
     } else if (auto tilesetDocument = qobject_cast<TilesetDocument*>(mDocument)) {
-        tilesetManager->reloadImages(tilesetDocument->tileset());
+        tilesetManager->reloadImages(tilesetDocument->tileset().data());
     }
 }
 

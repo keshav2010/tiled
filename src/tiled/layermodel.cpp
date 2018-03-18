@@ -155,7 +155,7 @@ bool LayerModel::setData(const QModelIndex &index, const QVariant &value,
 
     if (role == Qt::CheckStateRole) {
         if (index.column() == 1) {
-            Qt::CheckState c = static_cast<Qt::CheckState>(value.toInt());
+            Qt::CheckState c = value.value<Qt::CheckState>();
             const bool visible = (c == Qt::Checked);
             if (visible != layer->isVisible()) {
                 QUndoCommand *command = new SetLayerVisible(mMapDocument,
@@ -165,7 +165,7 @@ bool LayerModel::setData(const QModelIndex &index, const QVariant &value,
             }
         }
         if (index.column() == 2) {
-            Qt::CheckState c = static_cast<Qt::CheckState>(value.toInt());
+            Qt::CheckState c = value.value<Qt::CheckState>();
             const bool locked = (c == Qt::Checked);
             if (locked != layer->isLocked()) {
                 QUndoCommand *command = new SetLayerLocked(mMapDocument,
@@ -530,6 +530,39 @@ void LayerModel::toggleOtherLayers(Layer *layer)
     for (Layer *l : otherLayers) {
         if (visibility != l->isVisible())
             undoStack->push(new SetLayerVisible(mMapDocument, l, visibility));
+    }
+
+    undoStack->endMacro();
+}
+
+/**
+* Lock or unlock all other layers except the given \a layer.
+* If any other layer is unlocked then all layers will be locked, otherwise
+* the layers will be unlocked.
+*/
+void LayerModel::toggleLockOtherLayers(Layer *layer)
+{
+    const auto& otherLayers = collectAllSiblings(layer);
+    if (otherLayers.isEmpty())
+        return;
+
+    bool locked = false;
+    for (Layer *l : otherLayers) {
+        if (!l->isLocked()) {
+            locked = true;
+            break;
+        }
+    }
+
+    QUndoStack *undoStack = mMapDocument->undoStack();
+    if (locked)
+        undoStack->beginMacro(tr("Lock Other Layers"));
+    else
+        undoStack->beginMacro(tr("Unlock Other Layers"));
+
+    for (Layer *l : otherLayers) {
+        if (locked != l->isLocked())
+            undoStack->push(new SetLayerLocked(mMapDocument, l, locked));
     }
 
     undoStack->endMacro();

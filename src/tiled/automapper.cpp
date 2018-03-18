@@ -35,7 +35,6 @@
 #include "objectgroup.h"
 #include "tile.h"
 #include "tilelayer.h"
-#include "tilesetmanager.h"
 
 #include <QDebug>
 
@@ -65,9 +64,6 @@ AutoMapper::AutoMapper(MapDocument *workingDocument, Map *rules,
     , mNoOverlappingRules(false)
 {
     Q_ASSERT(mMapRules);
-
-    TilesetManager *tilesetManager = TilesetManager::instance();
-    tilesetManager->addReferences(rules->tilesets());
 
     if (!setupRuleMapProperties())
         return;
@@ -316,7 +312,7 @@ bool AutoMapper::setupRuleList()
     QVector<QRegion> combinedRegions = coherentRegions(mLayerInputRegions->region() +
                                                        mLayerOutputRegions->region());
 
-    qSort(combinedRegions.begin(), combinedRegions.end(), compareRuleRegion);
+    std::sort(combinedRegions.begin(), combinedRegions.end(), compareRuleRegion);
 
     const QVector<QRegion> rulesInput = coherentRegions(mLayerInputRegions->region());
     const QVector<QRegion> rulesOutput = coherentRegions(mLayerOutputRegions->region());
@@ -903,9 +899,6 @@ void AutoMapper::cleanTileLayers()
 void AutoMapper::cleanUpRulesMap()
 {
     cleanTilesets();
-
-    TilesetManager *tilesetManager = TilesetManager::instance();
-    tilesetManager->removeReferences(mMapRules->tilesets());
 
     delete mMapRules;
     mMapRules = nullptr;

@@ -12,7 +12,7 @@ QtGuiApplication {
     Depends { name: "qtpropertybrowser" }
     Depends { name: "qtsingleapplication" }
     Depends { name: "ib"; condition: qbs.targetOS.contains("macos") }
-    Depends { name: "Qt"; submodules: ["core", "widgets"]; versionAtLeast: "5.6" }
+    Depends { name: "Qt"; submodules: ["core", "widgets"]; versionAtLeast: "5.5" }
 
     property bool qtcRunnable: true
     property bool macSparkleEnabled: qbs.targetOS.contains("macos") && project.sparkleEnabled
@@ -54,6 +54,8 @@ QtGuiApplication {
     cpp.defines: {
         var defs = [
             "TILED_VERSION=" + version,
+            "QT_DEPRECATED_WARNINGS",
+            "QT_DISABLE_DEPRECATED_BEFORE=0x050700",
             "QT_NO_CAST_FROM_ASCII",
             "QT_NO_CAST_TO_ASCII",
             "QT_NO_URL_CAST_FROM_STRING",
@@ -185,16 +187,12 @@ QtGuiApplication {
         "containerhelpers.h",
         "createellipseobjecttool.cpp",
         "createellipseobjecttool.h",
-        "createmultipointobjecttool.cpp",
-        "createmultipointobjecttool.h",
         "createobjecttool.cpp",
         "createobjecttool.h",
         "createpointobjecttool.cpp",
         "createpointobjecttool.h",
         "createpolygonobjecttool.cpp",
         "createpolygonobjecttool.h",
-        "createpolylineobjecttool.cpp",
-        "createpolylineobjecttool.h",
         "createrectangleobjecttool.cpp",
         "createrectangleobjecttool.h",
         "createscalableobjecttool.cpp",
@@ -329,6 +327,8 @@ QtGuiApplication {
         "patreondialog.ui",
         "pluginlistmodel.cpp",
         "pluginlistmodel.h",
+        "pointhandle.cpp",
+        "pointhandle.h",
         "preferences.cpp",
         "preferencesdialog.cpp",
         "preferencesdialog.h",
@@ -454,6 +454,7 @@ QtGuiApplication {
         "toolmanager.h",
         "treeviewcombobox.cpp",
         "treeviewcombobox.h",
+        "undocommands.cpp",
         "undocommands.h",
         "undodock.cpp",
         "undodock.h",
@@ -577,7 +578,7 @@ QtGuiApplication {
         condition: qbs.targetOS.contains("linux")
         qbs.install: true
         qbs.installDir: "share/applications"
-        files: [ "../../tiled.desktop" ]
+        files: [ "../../org.mapeditor.Tiled.desktop" ]
     }
 
     Group {
@@ -585,7 +586,7 @@ QtGuiApplication {
         condition: qbs.targetOS.contains("linux")
         qbs.install: true
         qbs.installDir: "share/metainfo"
-        files: [ "../../tiled.appdata.xml" ]
+        files: [ "../../org.mapeditor.Tiled.appdata.xml" ]
     }
 
     Group {
@@ -601,7 +602,7 @@ QtGuiApplication {
         condition: qbs.targetOS.contains("linux")
         qbs.install: true
         qbs.installDir: "share/mime/packages"
-        files: [ "../../mime/tiled.xml" ]
+        files: [ "../../mime/org.mapeditor.Tiled.xml" ]
     }
 
     Group {

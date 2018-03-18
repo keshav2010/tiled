@@ -1,6 +1,6 @@
 /*
- * createpolylineobjecttool.h
- * Copyright 2014, Martin Ziel <martin.ziel.com>
+ * undocommands.cpp
+ * Copyright 2017, Thorbjørn Lindeijer <thorbjorn@lindeijer.nl>
  *
  * This file is part of Tiled.
  *
@@ -18,28 +18,28 @@
  * this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#pragma once
+#include "undocommands.h"
 
-#include "createmultipointobjecttool.h"
+#include <QUndoCommand>
 
 namespace Tiled {
 namespace Internal {
 
-class CreatePolylineObjectTool: public CreateMultipointObjectTool
+bool cloneChildren(const QUndoCommand *command, QUndoCommand *parent)
 {
-    Q_OBJECT
+    const int childCount = command->childCount();
 
-public:
-    CreatePolylineObjectTool(QObject *parent);
+    // Check if we're allowed to clone all children
+    for (int i = 0; i < childCount; ++i)
+        if (!dynamic_cast<const ClonableUndoCommand*>(command->child(i)))
+            return false;
 
-    void languageChanged() override;
+    // Actually clone the children
+    for (int i = 0; i < childCount; ++i)
+        dynamic_cast<const ClonableUndoCommand*>(command->child(i))->clone(parent);
 
-    void extend(MapObject *mapObject, bool extendingFirst);
-
-protected:
-    MapObject *createNewMapObject() override;
-    void finishNewMapObject() override;
-};
+    return true;
+}
 
 } // namespace Internal
 } // namespace Tiled
