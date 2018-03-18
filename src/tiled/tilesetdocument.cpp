@@ -26,7 +26,6 @@
 #include "wangset.h"
 #include "tile.h"
 #include "tilesetformat.h"
-#include "tilesetmanager.h"
 #include "tilesetterrainmodel.h"
 #include "tilesetwangsetmodel.h"
 
@@ -82,15 +81,10 @@ TilesetDocument::TilesetDocument(const SharedTileset &tileset, const QString &fi
 
     connect(mWangSetModel, &TilesetWangSetModel::wangSetRemoved,
             this, &TilesetDocument::onWangSetRemoved);
-
-    TilesetManager *tilesetManager = TilesetManager::instance();
-    tilesetManager->addReference(tileset);
 }
 
 TilesetDocument::~TilesetDocument()
 {
-    TilesetManager *tilesetManager = TilesetManager::instance();
-    tilesetManager->removeReference(mTileset);
 }
 
 bool TilesetDocument::save(const QString &fileName, QString *error)
@@ -99,9 +93,6 @@ bool TilesetDocument::save(const QString &fileName, QString *error)
 
     if (!tilesetFormat || !(tilesetFormat->capabilities() & FileFormat::Write))
         return false;
-
-    // todo: workaround to avoid writing the tileset like an external tileset reference
-    mTileset->setFileName(QString());
 
     if (!tilesetFormat->write(*tileset(), fileName)) {
         if (error)

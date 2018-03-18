@@ -51,7 +51,7 @@ class MapDocumentActionHandler : public QObject
 
 public:
     explicit MapDocumentActionHandler(QObject *parent = nullptr);
-    ~MapDocumentActionHandler();
+    ~MapDocumentActionHandler() override;
 
     static MapDocumentActionHandler *instance() { return mInstance; }
 
@@ -83,6 +83,7 @@ public:
     QAction *actionMoveLayerUp() const { return mActionMoveLayerUp; }
     QAction *actionMoveLayerDown() const { return mActionMoveLayerDown; }
     QAction *actionToggleOtherLayers() const { return mActionToggleOtherLayers; }
+    QAction *actionToggleLockOtherLayers() const { return mActionToggleLockOtherLayers; }
     QAction *actionLayerProperties() const { return mActionLayerProperties; }
 
     QAction *actionDuplicateObjects() const { return mActionDuplicateObjects; }
@@ -96,7 +97,7 @@ signals:
 
 public slots:
     void cut();
-    void copy();
+    bool copy();
     void delete_(); // 'delete' is a reserved word
 
     void selectAll();
@@ -126,6 +127,7 @@ public slots:
     void moveLayerDown();
     void removeLayer();
     void toggleOtherLayers();
+    void toggleLockOtherLayers();
     void layerProperties();
 
     void duplicateObjects();
@@ -163,6 +165,7 @@ private:
     QAction *mActionMoveLayerUp;
     QAction *mActionMoveLayerDown;
     QAction *mActionToggleOtherLayers;
+    QAction *mActionToggleLockOtherLayers;
     QAction *mActionLayerProperties;
 
     QAction *mActionDuplicateObjects;

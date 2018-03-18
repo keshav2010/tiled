@@ -220,20 +220,20 @@ private:
     void flipTileObject(const QTransform &flipTransform);
 
     int mId;
+    Shape mShape;
     QString mName;
     QString mType;
     QPointF mPos;
     QSizeF mSize;
     TextData mTextData;
     QPolygonF mPolygon;
-    Shape mShape;
     Cell mCell;
     const ObjectTemplate *mObjectTemplate;
     ObjectGroup *mObjectGroup;
     qreal mRotation;
     bool mVisible;
-    ChangedProperties mChangedProperties;
     bool mTemplateBase;
+    ChangedProperties mChangedProperties;
 };
 
 /**
@@ -510,8 +510,5 @@ inline void MapObject::markAsTemplateBase()
 
 } // namespace Tiled
 
-#if QT_VERSION < 0x050500
-Q_DECLARE_METATYPE(Qt::Alignment)
-#endif
-
+Q_DECLARE_METATYPE(Tiled::MapObject::Shape)
 Q_DECLARE_METATYPE(Tiled::MapObject*)

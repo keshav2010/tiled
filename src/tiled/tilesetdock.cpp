@@ -59,7 +59,6 @@
 #include <QMimeData>
 #include <QPushButton>
 #include <QSettings>
-#include <QSignalMapper>
 #include <QStackedWidget>
 #include <QStylePainter>
 #include <QToolBar>
@@ -151,21 +150,36 @@ public:
 static void removeTileReferences(MapDocument *mapDocument,
                                  std::function<bool(const Cell &)> condition)
 {
-    QUndoStack *undoStack = mapDocument->undoStack();
+    // Commands delayed to avoid invalidating object list iterator
+    QList<QUndoCommand*> commands;
 
-    for (Layer *layer : mapDocument->map()->layers()) {
-        if (TileLayer *tileLayer = layer->asTileLayer()) {
+    LayerIterator it(mapDocument->map());
+    while (Layer *layer = it.next()) {
+        switch (layer->layerType()) {
+        case Layer::TileLayerType: {
+            auto tileLayer = static_cast<TileLayer*>(layer);
             const QRegion refs = tileLayer->region(condition);
             if (!refs.isEmpty())
-                undoStack->push(new EraseTiles(mapDocument, tileLayer, refs));
-
-        } else if (ObjectGroup *objectGroup = layer->asObjectGroup()) {
+                commands.append(new EraseTiles(mapDocument, tileLayer, refs));
+            break;
+        }
+        case Layer::ObjectGroupType: {
+            auto objectGroup = static_cast<ObjectGroup*>(layer);
             for (MapObject *object : *objectGroup) {
                 if (condition(object->cell()))
-                    undoStack->push(new RemoveMapObject(mapDocument, object));
+                    commands.append(new RemoveMapObject(mapDocument, object));
             }
+            break;
+        }
+        case Layer::ImageLayerType:
+        case Layer::GroupLayerType:
+            break;
         }
     }
+
+    QUndoStack *undoStack = mapDocument->undoStack();
+    for (QUndoCommand *command : commands)
+        undoStack->push(command);
 }
 
 } // anonymous namespace
@@ -188,7 +202,6 @@ TilesetDock::TilesetDock(QWidget *parent)
     , mTilesetMenuButton(new TilesetMenuButton(this))
     , mTilesetMenu(new QMenu(this))
     , mTilesetActionGroup(new QActionGroup(this))
-    , mTilesetMenuMapper(nullptr)
     , mEmittingStampCaptured(false)
     , mSynchronizingSelection(false)
 {
@@ -692,10 +705,8 @@ void TilesetDock::setCurrentTiles(TileLayer *tiles)
         // Create a tile stamp with these tiles
         Map *map = mMapDocument->map();
         Map *stamp = new Map(map->orientation(),
-                             tiles->width(),
-                             tiles->height(),
-                             map->tileWidth(),
-                             map->tileHeight());
+                             tiles->size(),
+                             map->tileSize());
         stamp->addLayer(tiles->clone());
         stamp->addTilesets(tiles->usedTilesets());
 
@@ -795,7 +806,11 @@ void TilesetDock::onTilesetDataChanged(const QModelIndex &topLeft, const QModelI
 
 void TilesetDock::onTabMoved(int from, int to)
 {
+#if QT_VERSION >= 0x050600
     mTilesets.move(from, to);
+#else
+    mTilesets.insert(to, mTilesets.takeAt(from));
+#endif
     mTilesetDocuments.move(from, to);
 
     // Move the related tileset view
@@ -993,28 +1008,16 @@ void TilesetDock::refreshTilesetMenu()
 {
     mTilesetMenu->clear();
 
-    if (mTilesetMenuMapper) {
-        mTabBar->disconnect(mTilesetMenuMapper);
-        delete mTilesetMenuMapper;
-    }
-
-    mTilesetMenuMapper = new QSignalMapper(this);
-    connect(mTilesetMenuMapper, SIGNAL(mapped(int)),
-            mTabBar, SLOT(setCurrentIndex(int)));
-
     const int currentIndex = mTabBar->currentIndex();
 
     for (int i = 0; i < mTabBar->count(); ++i) {
-        QAction *action = new QAction(mTabBar->tabText(i), this);
-        action->setCheckable(true);
+        QAction *action = mTilesetMenu->addAction(mTabBar->tabText(i));
+        connect(action, &QAction::triggered, [=] { mTabBar->setCurrentIndex(i); });
 
+        action->setCheckable(true);
         mTilesetActionGroup->addAction(action);
         if (i == currentIndex)
             action->setChecked(true);
-
-        mTilesetMenu->addAction(action);
-        connect(action, SIGNAL(triggered()), mTilesetMenuMapper, SLOT(map()));
-        mTilesetMenuMapper->setMapping(action, i);
     }
 }
 

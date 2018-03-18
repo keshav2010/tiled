@@ -119,6 +119,9 @@ public:
     Layer *currentLayer() const { return mCurrentLayer; }
     void setCurrentLayer(Layer *layer);
 
+    const QList<Layer*> &selectedLayers() const { return mSelectedLayers; }
+    void setSelectedLayers(const QList<Layer*> &layers);
+
     /**
      * Resize this map to the given \a size, while at the same time shifting
      * the contents by \a offset. If \a removeObjects is true then all objects
@@ -149,10 +152,15 @@ public:
     void moveLayerDown(Layer *layer);
     void removeLayer(Layer *layer);
     void toggleOtherLayers(Layer *layer);
+    void toggleLockOtherLayers(Layer *layer);
 
     void insertTileset(int index, const SharedTileset &tileset);
     void removeTilesetAt(int index);
     SharedTileset replaceTileset(int index, const SharedTileset &tileset);
+
+    void paintTileLayers(const Map *map, bool mergeable = false,
+                         QVector<SharedTileset> *missingTilesets = nullptr,
+                         QHash<TileLayer *, QRegion> *paintedRegions = nullptr);
 
     void replaceObjectTemplate(const ObjectTemplate *oldObjectTemplate,
                                const ObjectTemplate *newObjectTemplate);
@@ -200,6 +208,8 @@ public:
     const QList<MapObject*> &selectedObjects() const
     { return mSelectedObjects; }
 
+    QList<MapObject*> selectedObjectsOrdered() const;
+
     /**
      * Sets the list of selected objects, emitting the selectedObjectsChanged
      * signal.
@@ -223,6 +233,11 @@ signals:
      */
     void selectedAreaChanged(const QRegion &newSelection,
                              const QRegion &oldSelection);
+
+    /**
+     * Emitted when the list of selected layers changes.
+     */
+    void selectedLayersChanged();
 
     /**
      * Emitted when the list of selected objects changes.
@@ -331,6 +346,7 @@ private:
     Map *mMap;
     LayerModel *mLayerModel;
     QRegion mSelectedArea;
+    QList<Layer*> mSelectedLayers;
     QList<MapObject*> mSelectedObjects;
     MapObject *mHoveredMapObject;       /**< Map object with mouse on top. */
     MapRenderer *mRenderer;

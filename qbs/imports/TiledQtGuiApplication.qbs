@@ -11,6 +11,10 @@ QtGuiApplication {
             return ["$ORIGIN/../lib"];
     }
     cpp.cxxLanguageVersion: "c++11"
+    cpp.defines: [
+        "QT_DEPRECATED_WARNINGS",
+        "QT_DISABLE_DEPRECATED_BEFORE=0x050700"
+    ]
 
     Properties {
         condition: qbs.targetOS.contains("macos")

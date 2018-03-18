@@ -112,6 +112,11 @@ TileLayer::TileLayer(const QString &name, int x, int y, int width, int height)
     Q_ASSERT(height >= 0);
 }
 
+TileLayer::TileLayer(const QString &name, QPoint position, QSize size)
+    : TileLayer(name, position.x(), position.y(), size.width(), size.height())
+{
+}
+
 static QMargins maxMargins(const QMargins &a,
                            const QMargins &b)
 {
@@ -151,6 +156,10 @@ QMargins TileLayer::drawMargins() const
     return computeDrawMargins(usedTilesets());
 }
 
+/**
+ * Calculates the region of cells in this tile layer for which the given
+ * \a condition returns true.
+ */
 QRegion TileLayer::region(std::function<bool (const Cell &)> condition) const
 {
     QRegion region;
@@ -514,10 +523,10 @@ QSet<SharedTileset> TileLayer::usedTilesets() const
             for (const Cell &cell : chunk)
                 if (const Tile *tile = cell.tile())
                     tilesets.insert(tile->sharedTileset());
-
-            mUsedTilesets.swap(tilesets);
-            mUsedTilesetsDirty = false;
         }
+
+        mUsedTilesets.swap(tilesets);
+        mUsedTilesetsDirty = false;
     }
 
     return mUsedTilesets;

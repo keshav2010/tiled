@@ -121,11 +121,9 @@ SOURCES += aboutdialog.cpp \
     commandmanager.cpp \
     consoledock.cpp \
     createellipseobjecttool.cpp \
-    createmultipointobjecttool.cpp \
     createobjecttool.cpp \
     createpointobjecttool.cpp \
     createpolygonobjecttool.cpp \
-    createpolylineobjecttool.cpp \
     createrectangleobjecttool.cpp \
     createscalableobjecttool.cpp \
     createtemplatetool.cpp \
@@ -188,6 +186,7 @@ SOURCES += aboutdialog.cpp \
     painttilelayer.cpp \
     patreondialog.cpp \
     pluginlistmodel.cpp \
+    pointhandle.cpp \
     preferences.cpp \
     preferencesdialog.cpp \
     propertiesdock.cpp \
@@ -247,6 +246,7 @@ SOURCES += aboutdialog.cpp \
     tmxmapformat.cpp \
     toolmanager.cpp \
     treeviewcombobox.cpp \
+    undocommands.cpp \
     undodock.cpp \
     utils.cpp \
     varianteditorfactory.cpp \
@@ -317,11 +317,9 @@ HEADERS += aboutdialog.h \
     consoledock.h \
     containerhelpers.h \
     createellipseobjecttool.h \
-    createmultipointobjecttool.h \
     createobjecttool.h \
     createpointobjecttool.h \
     createpolygonobjecttool.h \
-    createpolylineobjecttool.h \
     createrectangleobjecttool.h \
     createscalableobjecttool.h \
     createtemplatetool.h \
@@ -384,6 +382,7 @@ HEADERS += aboutdialog.h \
     painttilelayer.h \
     patreondialog.h \
     pluginlistmodel.h \
+    pointhandle.h \
     preferencesdialog.h \
     preferences.h \
     propertiesdock.h \
@@ -504,7 +503,7 @@ mimeiconscalable.files += images/scalable/application-x-tiled.svg
 INSTALLS += mimeiconscalable
 
 mimeinfofile.path = $${PREFIX}/share/mime/packages/
-mimeinfofile.files += ../../mime/tiled.xml
+mimeinfofile.files += ../../mime/org.mapeditor.Tiled.xml
 INSTALLS += mimeinfofile
 
 thumbnailgenerator.path = $${PREFIX}/share/thumbnailers/
@@ -512,11 +511,11 @@ thumbnailgenerator.files += ../../mime/tiled.thumbnailer
 INSTALLS += thumbnailgenerator
 
 desktopfile.path = $${PREFIX}/share/applications/
-desktopfile.files += ../../tiled.desktop
+desktopfile.files += ../../org.mapeditor.Tiled.desktop
 INSTALLS += desktopfile
 
 appdatafile.path = $${PREFIX}/share/metainfo/
-appdatafile.files += ../../tiled.appdata.xml
+appdatafile.files += ../../org.mapeditor.Tiled.appdata.xml
 INSTALLS += appdatafile
 
 manpage.path = $${PREFIX}/share/man/man1/
