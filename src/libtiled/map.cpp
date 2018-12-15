@@ -41,6 +41,11 @@
 
 using namespace Tiled;
 
+Map::Map():
+    Map(Orthogonal, 0, 0, 0, 0, false)
+{
+}
+
 Map::Map(Orientation orientation,
          int width, int height, int tileWidth, int tileHeight, bool infinite):
     Object(MapType),
@@ -56,6 +61,7 @@ Map::Map(Orientation orientation,
     mStaggerIndex(StaggerOdd),
     mDrawMarginsDirty(true),
     mLayerDataFormat(Base64Zlib),
+    mNextLayerId(1),
     mNextObjectId(1)
 {
 }
@@ -69,35 +75,47 @@ Map::Map(Orientation orientation,
 {
 }
 
-Map::Map(const Map &map):
-    Object(map),
-    mOrientation(map.mOrientation),
-    mRenderOrder(map.mRenderOrder),
-    mWidth(map.mWidth),
-    mHeight(map.mHeight),
-    mTileWidth(map.mTileWidth),
-    mTileHeight(map.mTileHeight),
-    mInfinite(map.mInfinite),
-    mHexSideLength(map.mHexSideLength),
-    mStaggerAxis(map.mStaggerAxis),
-    mStaggerIndex(map.mStaggerIndex),
-    mBackgroundColor(map.mBackgroundColor),
-    mDrawMargins(map.mDrawMargins),
-    mDrawMarginsDirty(map.mDrawMarginsDirty),
-    mTilesets(map.mTilesets),
-    mLayerDataFormat(map.mLayerDataFormat),
-    mNextObjectId(1)
-{
-    for (const Layer *layer : map.mLayers) {
-        Layer *clone = layer->clone();
-        clone->setMap(this);
-        mLayers.append(clone);
-    }
-}
-
 Map::~Map()
 {
     qDeleteAll(mLayers);
+}
+
+void Map::setWidth(int width)
+{
+    if (width == mWidth)
+        return;
+
+    mWidth = width;
+    emit widthChanged();
+    emit sizeChanged();
+}
+
+void Map::setHeight(int height)
+{
+    if (height == mHeight)
+        return;
+
+    mHeight = height;
+    emit heightChanged();
+    emit sizeChanged();
+}
+
+void Map::setTileWidth(int width)
+{
+    if (width == mTileWidth)
+        return;
+
+    mTileWidth = width;
+    emit tileWidthChanged();
+}
+
+void Map::setTileHeight(int height)
+{
+    if (height == mTileHeight)
+        return;
+
+    mTileHeight = height;
+    emit tileHeightChanged();
 }
 
 QMargins Map::drawMargins() const
@@ -173,41 +191,10 @@ void Map::recomputeDrawMargins() const
 int Map::layerCount(Layer::TypeFlag type) const
 {
     int count = 0;
-    LayerIterator iterator(this);
-    while (Layer *layer = iterator.next())
-       if (layer->layerType() == type)
-           count++;
+    LayerIterator iterator(this, type);
+    while (iterator.next())
+       count++;
     return count;
-}
-
-/**
- * Returns the list of all object groups.
- *
- * @deprecated Use the LayerIterator instead.
- */
-QList<ObjectGroup*> Map::objectGroups() const
-{
-    QList<ObjectGroup*> layers;
-    LayerIterator iterator(this);
-    while (Layer *layer = iterator.next())
-        if (ObjectGroup *og = layer->asObjectGroup())
-            layers.append(og);
-    return layers;
-}
-
-/**
- * Returns the list of all tile layers.
- *
- * @deprecated Use the LayerIterator instead.
- */
-QList<TileLayer*> Map::tileLayers() const
-{
-    QList<TileLayer*> layers;
-    LayerIterator iterator(this);
-    while (Layer *layer = iterator.next())
-        if (TileLayer *tl = layer->asTileLayer())
-            layers.append(tl);
-    return layers;
 }
 
 void Map::addLayer(Layer *layer)
@@ -243,6 +230,9 @@ void Map::insertLayer(int index, Layer *layer)
 
 void Map::adoptLayer(Layer *layer)
 {
+    if (layer->id() == 0)
+        layer->setId(takeNextLayerId());
+
     layer->setMap(this);
 
     if (ObjectGroup *group = layer->asObjectGroup())
@@ -336,6 +326,30 @@ bool Map::isTilesetUsed(const Tileset *tileset) const
     return false;
 }
 
+Map *Map::clone() const
+{
+    Map *o = new Map(mOrientation, mWidth, mHeight, mTileWidth, mTileHeight, mInfinite);
+    o->mRenderOrder = mRenderOrder;
+    o->mHexSideLength = mHexSideLength;
+    o->mStaggerAxis = mStaggerAxis;
+    o->mStaggerIndex = mStaggerIndex;
+    o->mBackgroundColor = mBackgroundColor;
+    o->mDrawMargins = mDrawMargins;
+    o->mDrawMarginsDirty = mDrawMarginsDirty;
+    for (const Layer *layer : mLayers) {
+        Layer *clone = layer->clone();
+        clone->setId(layer->id());
+        clone->setMap(o);
+        o->mLayers.append(clone);
+    }
+    o->mTilesets = mTilesets;
+    o->mLayerDataFormat = mLayerDataFormat;
+    o->mNextLayerId = mNextLayerId;
+    o->mNextObjectId = mNextObjectId;
+    o->setProperties(properties());
+    return o;
+}
+
 QList<MapObject*> Map::replaceObjectTemplate(const ObjectTemplate *oldObjectTemplate,
                                              const ObjectTemplate *newObjectTemplate)
 {
@@ -343,8 +357,8 @@ QList<MapObject*> Map::replaceObjectTemplate(const ObjectTemplate *oldObjectTemp
 
     QList<MapObject*> changedObjects;
 
-    for (auto group : objectGroups()) {
-        for (auto o : group->objects()){
+    for (auto layer : objectGroups()) {
+        for (auto o : static_cast<ObjectGroup*>(layer)->objects()) {
             if (o->objectTemplate() == oldObjectTemplate) {
                 o->setObjectTemplate(newObjectTemplate);
                 o->syncWithTemplate();

@@ -37,6 +37,8 @@ PointHandle::PointHandle(MapObject *mapObject, int pointIndex)
     , mSelected(false)
     , mHighlighted(false)
 {
+    setAcceptedMouseButtons(Qt::MouseButtons());
+    setAcceptHoverEvents(true);
     setFlags(QGraphicsItem::ItemIgnoresTransformations |
              QGraphicsItem::ItemIgnoresParentOpacity);
     setZValue(10000);

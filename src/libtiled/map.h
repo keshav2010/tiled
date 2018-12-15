@@ -48,13 +48,40 @@ class ObjectTemplate;
 class Tile;
 
 /**
- * A tile map. Consists of a stack of layers, each can be either a TileLayer
- * or an ObjectGroup.
+ * A tile map. Consists of a stack of layers.
  *
  * It also keeps track of the list of referenced tilesets.
  */
 class TILEDSHARED_EXPORT Map : public Object
 {
+    Q_OBJECT
+
+    Q_PROPERTY(int width READ width NOTIFY widthChanged)
+    Q_PROPERTY(int height READ height NOTIFY heightChanged)
+    Q_PROPERTY(int tileWidth READ tileWidth NOTIFY tileWidthChanged)
+    Q_PROPERTY(int tileHeight READ tileHeight NOTIFY tileHeightChanged)
+    Q_PROPERTY(QSize size READ size NOTIFY sizeChanged)
+
+    Q_ENUMS(Orientation
+            LayerDataFormat
+            RenderOrder
+            StaggerAxis
+            StaggerIndex)
+
+    class LayerIteratorHelper
+    {
+    public:
+        LayerIteratorHelper(const Map &map, int layerTypes);
+
+        LayerIterator begin() const;
+        LayerIterator end() const;
+        bool isEmpty() const;
+
+    private:
+        const Map &mMap;
+        const int mLayerTypes;
+    };
+
 public:
     /**
      * The orientation of the map determines how it should be rendered. An
@@ -111,8 +138,10 @@ public:
         StaggerEven = 1
     };
 
+    Map();
+
     /**
-     * Constructor, taking map orientation, size and tile size as parameters.
+     * Constructor taking map orientation, size and tile size as parameters.
      */
     Map(Orientation orientation,
         int width, int height,
@@ -125,11 +154,9 @@ public:
         bool infinite = false);
 
     /**
-     * Copy constructor. Makes sure that a deep-copy of the layers is created.
+     * Destructor.
      */
-    Map(const Map &map);
-
-    ~Map() override;
+    ~Map();
 
     /**
      * Returns the orientation of the map.
@@ -161,7 +188,7 @@ public:
     /**
      * Sets the width of this map in tiles.
      */
-    void setWidth(int width) { mWidth = width; }
+    void setWidth(int width);
 
     /**
      * Returns the height of this map in tiles.
@@ -171,7 +198,7 @@ public:
     /**
      * Sets the height of this map in tiles.
      */
-    void setHeight(int height) { mHeight = height; }
+    void setHeight(int height);
 
     /**
      * Returns the size of this map. Provided for convenience.
@@ -186,7 +213,7 @@ public:
     /**
      * Sets the width of one tile.
      */
-    void setTileWidth(int width) { mTileWidth = width; }
+    void setTileWidth(int width);
 
     /**
      * Returns the tile height used by this map.
@@ -196,7 +223,7 @@ public:
     /**
      * Sets the height of one tile.
      */
-    void setTileHeight(int height) { mTileHeight = height; }
+    void setTileHeight(int height);
 
     bool infinite() const { return mInfinite; }
 
@@ -251,18 +278,19 @@ public:
     { return layerCount(Layer::GroupLayerType); }
 
     /**
-     * Returns the layer at the specified index.
+     * Returns the top-level layer at the specified \a index.
      */
     Layer *layerAt(int index) const
     { return mLayers.at(index); }
 
     /**
-     * Returns the list of layers of this map.
+     * Returns the list of top-level layers of this map.
      */
     const QList<Layer*> &layers() const { return mLayers; }
 
-    QList<ObjectGroup*> objectGroups() const;
-    QList<TileLayer*> tileLayers() const;
+    LayerIteratorHelper allLayers(int layerTypes = Layer::AnyLayerType) const;
+    LayerIteratorHelper tileLayers() const;
+    LayerIteratorHelper objectGroups() const;
 
     /**
      * Adds a layer to this map.
@@ -390,6 +418,8 @@ public:
      */
     bool isTilesetUsed(const Tileset *tileset) const;
 
+    Map *clone() const;
+
     /**
      * Returns whether the map is staggered
      */
@@ -401,12 +431,23 @@ public:
     void setLayerDataFormat(LayerDataFormat format)
     { mLayerDataFormat = format; }
 
+    void setNextLayerId(int nextId);
+    int nextLayerId() const;
+    int takeNextLayerId();
+
     void setNextObjectId(int nextId);
     int nextObjectId() const;
     int takeNextObjectId();
     void initializeObjectIds(ObjectGroup &objectGroup);
 
     QRegion tileRegion() const;
+
+signals:
+    void widthChanged();
+    void heightChanged();
+    void tileWidthChanged();
+    void tileHeightChanged();
+    void sizeChanged();
 
 private:
     friend class GroupLayer;    // so it can call adoptLayer
@@ -431,6 +472,7 @@ private:
     QList<Layer*> mLayers;
     QVector<SharedTileset> mTilesets;
     LayerDataFormat mLayerDataFormat;
+    int mNextLayerId;
     int mNextObjectId;
 };
 
@@ -476,6 +518,56 @@ inline void Map::invalidateDrawMargins()
 }
 
 /**
+ * Returns a helper for iterating all tile layers of the given \a layerTypes
+ * in this map.
+ */
+inline Map::LayerIteratorHelper Map::allLayers(int layerTypes) const
+{
+    return LayerIteratorHelper { *this, layerTypes };
+}
+
+/**
+ * Returns a helper for iterating all tile layers in this map.
+ */
+inline Map::LayerIteratorHelper Map::tileLayers() const
+{
+    return allLayers(Layer::TileLayerType);
+}
+
+/**
+ * Returns a helper for iterating all object groups in this map.
+ */
+inline Map::LayerIteratorHelper Map::objectGroups() const
+{
+    return allLayers(Layer::ObjectGroupType);
+}
+
+/**
+ * Sets the next id to be used for layers of this map.
+ */
+inline void Map::setNextLayerId(int nextId)
+{
+    Q_ASSERT(nextId > 0);
+    mNextLayerId = nextId;
+}
+
+/**
+ * Returns the next layer id for this map.
+ */
+inline int Map::nextLayerId() const
+{
+    return mNextLayerId;
+}
+
+/**
+ * Returns the next layer id for this map and allocates a new one.
+ */
+inline int Map::takeNextLayerId()
+{
+    return mNextLayerId++;
+}
+
+/**
  * Sets the next id to be used for objects on this map.
  */
 inline void Map::setNextObjectId(int nextId)
@@ -498,6 +590,31 @@ inline int Map::nextObjectId() const
 inline int Map::takeNextObjectId()
 {
     return mNextObjectId++;
+}
+
+
+inline Map::LayerIteratorHelper::LayerIteratorHelper(const Map &map, int layerTypes)
+    : mMap(map)
+    , mLayerTypes(layerTypes)
+{}
+
+inline LayerIterator Map::LayerIteratorHelper::begin() const
+{
+    LayerIterator iterator(&mMap, mLayerTypes);
+    iterator.next();
+    return iterator;
+}
+
+inline LayerIterator Map::LayerIteratorHelper::end() const
+{
+    LayerIterator iterator(&mMap, mLayerTypes);
+    iterator.toBack();
+    return iterator;
+}
+
+inline bool Map::LayerIteratorHelper::isEmpty() const
+{
+    return LayerIterator(&mMap, mLayerTypes).next() == nullptr;
 }
 
 

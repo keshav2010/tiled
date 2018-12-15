@@ -51,6 +51,14 @@ class TileLayer;
  */
 class TILEDSHARED_EXPORT Layer : public Object
 {
+    Q_OBJECT
+
+    Q_PROPERTY(QString name READ name)
+    Q_PROPERTY(qreal opacity READ opacity)
+    Q_PROPERTY(bool visible READ isVisible)
+    Q_PROPERTY(bool locked READ isLocked)
+    Q_PROPERTY(QPointF offset READ offset)
+
 public:
     enum TypeFlag {
         TileLayerType   = 0x01,
@@ -65,6 +73,13 @@ public:
      * Constructor.
      */
     Layer(TypeFlag type, const QString &name, int x, int y);
+
+    /**
+     * The layer ID can be used to unique identify this layer of the map. It
+     * stays the same regardless of whether the layer is moved or renamed.
+     */
+    int id() const { return mId; }
+    void setId(int id) { mId = id; }
 
     /**
      * Returns the type of this layer.
@@ -168,6 +183,8 @@ public:
 
     QPointF totalOffset() const;
 
+    bool canMergeDown() const;
+
     virtual bool isEmpty() const = 0;
 
     /**
@@ -190,7 +207,7 @@ public:
     /**
      * Returns whether this layer can merge together with the \a other layer.
      */
-    virtual bool canMergeWith(Layer *other) const = 0;
+    virtual bool canMergeWith(const Layer *other) const = 0;
 
     /**
      * Returns a newly allocated layer that is the result of merging this layer
@@ -199,7 +216,7 @@ public:
      *
      * Should only be called when canMergeWith returns true.
      */
-    virtual Layer *mergedWith(Layer *other) const = 0;
+    virtual Layer *mergedWith(const Layer *other) const = 0;
 
     /**
      * Returns a duplicate of this layer. The caller is responsible for the
@@ -231,6 +248,7 @@ protected:
     Layer *initializeClone(Layer *clone) const;
 
     QString mName;
+    int mId;
     TypeFlag mLayerType;
     int mX;
     int mY;
@@ -290,6 +308,14 @@ public:
     void toFront();
     void toBack();
 
+    // Allow use as general iterator and in range-based for loops
+    bool operator==(const LayerIterator &other) const;
+    bool operator!=(const LayerIterator &other) const;
+    LayerIterator &operator++();
+    LayerIterator operator++(int);
+    Layer *operator*() const;
+    Layer *operator->() const;
+
 private:
     const Map *mMap;
     Layer *mCurrentLayer;
@@ -344,6 +370,34 @@ inline bool LayerIterator::hasPreviousSibling() const
 inline bool LayerIterator::hasParent() const
 {
     return mCurrentLayer && mCurrentLayer->parentLayer();
+}
+
+inline bool LayerIterator::operator!=(const LayerIterator &other) const
+{
+    return !(*this == other);
+}
+
+inline LayerIterator &LayerIterator::operator++()
+{
+    next();
+    return *this;
+}
+
+inline LayerIterator LayerIterator::operator++(int)
+{
+    LayerIterator it = *this;
+    next();
+    return it;
+}
+
+inline Layer *LayerIterator::operator*() const
+{
+    return mCurrentLayer;
+}
+
+inline Layer *LayerIterator::operator->() const
+{
+    return mCurrentLayer;
 }
 
 

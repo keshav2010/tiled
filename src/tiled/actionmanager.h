@@ -42,6 +42,7 @@ public:
     static void registerAction(QAction *action, Id id);
 
     static QAction *action(Id id);
+    static QAction *findAction(Id id);
 
 signals:
     void actionAdded(Id id);

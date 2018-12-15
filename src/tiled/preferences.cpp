@@ -68,6 +68,12 @@ Preferences::Preferences()
     mObjectTypesFile = stringValue("ObjectTypesFile");
     mSettings->endGroup();
 
+    mSettings->beginGroup(QLatin1String("Export"));
+    setExportOption(EmbedTilesets, boolValue("EmbedTilesets", false));
+    setExportOption(DetachTemplateInstances, boolValue("DetachTemplateInstances", false));
+    setExportOption(ResolveObjectTypesAndProperties, boolValue("ResolveObjectTypesAndProperties", false));
+    mSettings->endGroup();
+
     SaveFile::setSafeSavingEnabled(mSafeSavingEnabled);
 
     // Retrieve interface settings
@@ -82,6 +88,7 @@ Preferences::Preferences()
     mGridFine = intValue("GridFine", 4);
     mObjectLineWidth = realValue("ObjectLineWidth", 2);
     mHighlightCurrentLayer = boolValue("HighlightCurrentLayer");
+    mHighlightHoveredObject = boolValue("HighlightHoveredObject", true);
     mShowTilesetGrid = boolValue("ShowTilesetGrid", true);
     mLanguage = stringValue("Language");
     mUseOpenGL = boolValue("OpenGL");
@@ -337,6 +344,17 @@ void Preferences::setHighlightCurrentLayer(bool highlight)
     emit highlightCurrentLayerChanged(mHighlightCurrentLayer);
 }
 
+void Preferences::setHighlightHoveredObject(bool highlight)
+{
+    if (mHighlightHoveredObject == highlight)
+        return;
+
+    mHighlightHoveredObject = highlight;
+    mSettings->setValue(QLatin1String("Interface/HighlightHoveredObject"),
+                        mHighlightHoveredObject);
+    emit highlightHoveredObjectChanged(mHighlightHoveredObject);
+}
+
 void Preferences::setShowTilesetGrid(bool showTilesetGrid)
 {
     if (mShowTilesetGrid == showTilesetGrid)
@@ -346,11 +364,6 @@ void Preferences::setShowTilesetGrid(bool showTilesetGrid)
     mSettings->setValue(QLatin1String("Interface/ShowTilesetGrid"),
                         mShowTilesetGrid);
     emit showTilesetGridChanged(mShowTilesetGrid);
-}
-
-Map::LayerDataFormat Preferences::layerDataFormat() const
-{
-    return mLayerDataFormat;
 }
 
 void Preferences::setLayerDataFormat(Map::LayerDataFormat
@@ -364,11 +377,6 @@ void Preferences::setLayerDataFormat(Map::LayerDataFormat
                         mLayerDataFormat);
 }
 
-Map::RenderOrder Preferences::mapRenderOrder() const
-{
-    return mMapRenderOrder;
-}
-
 void Preferences::setMapRenderOrder(Map::RenderOrder mapRenderOrder)
 {
     if (mMapRenderOrder == mapRenderOrder)
@@ -377,11 +385,6 @@ void Preferences::setMapRenderOrder(Map::RenderOrder mapRenderOrder)
     mMapRenderOrder = mapRenderOrder;
     mSettings->setValue(QLatin1String("Storage/MapRenderOrder"),
                         mMapRenderOrder);
-}
-
-bool Preferences::dtdEnabled() const
-{
-    return mDtdEnabled;
 }
 
 void Preferences::setDtdEnabled(bool enabled)
@@ -397,9 +400,28 @@ void Preferences::setSafeSavingEnabled(bool enabled)
     SaveFile::setSafeSavingEnabled(enabled);
 }
 
-QString Preferences::language() const
+void Preferences::setExportOption(Preferences::ExportOption option, bool value)
 {
-    return mLanguage;
+#if QT_VERSION >= 0x050700
+    mExportOptions.setFlag(option, value);
+#else
+    if (value)
+        mExportOptions |= option;
+    else
+        mExportOptions &= ~option;
+#endif
+
+    switch (option) {
+    case EmbedTilesets:
+        mSettings->setValue(QLatin1String("Export/EmbedTilesets"), value);
+        break;
+    case DetachTemplateInstances:
+        mSettings->setValue(QLatin1String("Export/DetachTemplateInstances"), value);
+        break;
+    case ResolveObjectTypesAndProperties:
+        mSettings->setValue(QLatin1String("Export/ResolveObjectTypesAndProperties"), value);
+        break;
+    }
 }
 
 void Preferences::setLanguage(const QString &language)
@@ -413,11 +435,6 @@ void Preferences::setLanguage(const QString &language)
 
     LanguageManager::instance()->installTranslators();
     emit languageChanged();
-}
-
-bool Preferences::reloadTilesetsOnChange() const
-{
-    return mReloadTilesetsOnChange;
 }
 
 void Preferences::setReloadTilesetsOnChanged(bool value)
@@ -470,8 +487,9 @@ static QString lastPathKey(Preferences::FileType fileType)
     case Preferences::ExternalTileset:
         key.append(QLatin1String("ExternalTileset"));
         break;
-    default:
-        Q_ASSERT(false); // Getting here means invalid file type
+    case Preferences::WorldFile:
+        key.append(QLatin1String("WorldFile"));
+        break;
     }
 
     return key;
@@ -520,11 +538,6 @@ void Preferences::setAutomappingDrawing(bool enabled)
 {
     mAutoMapDrawing = enabled;
     mSettings->setValue(QLatin1String("Automapping/WhileDrawing"), enabled);
-}
-
-QString Preferences::mapsDirectory() const
-{
-    return mMapsDirectory;
 }
 
 void Preferences::setMapsDirectory(const QString &path)

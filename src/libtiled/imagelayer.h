@@ -45,23 +45,18 @@ namespace Tiled {
  */
 class TILEDSHARED_EXPORT ImageLayer : public Layer
 {
-public:
-    /**
-     * Constructor.
-     */
-    ImageLayer(const QString &name, int x, int y);
+    Q_OBJECT
 
-    /**
-     * Destructor.
-     */
-    ~ImageLayer();
+public:
+    ImageLayer(const QString &name, int x, int y);
+    ~ImageLayer() override;
 
     QSet<SharedTileset> usedTilesets() const override { return QSet<SharedTileset>(); }
     bool referencesTileset(const Tileset *) const override { return false; }
     void replaceReferencesToTileset(Tileset *, Tileset *) override {}
 
-    bool canMergeWith(Layer *) const override { return false; }
-    Layer *mergedWith(Layer *) const override { return nullptr; }
+    bool canMergeWith(const Layer *) const override { return false; }
+    Layer *mergedWith(const Layer *) const override { return nullptr; }
 
     /**
      * Returns the transparent color, or an invalid color if no transparent
@@ -113,7 +108,6 @@ public:
      */
     bool loadFromImage(const QImage &image, const QUrl &source);
     bool loadFromImage(const QImage &image, const QString &source);
-
     bool loadFromImage(const QUrl &url);
 
     /**
@@ -131,11 +125,5 @@ private:
     QColor mTransparentColor;
     QPixmap mImage;
 };
-
-
-inline bool ImageLayer::loadFromImage(const QUrl &url)
-{
-    return loadFromImage(QImage(url.toLocalFile()), url);
-}
 
 } // namespace Tiled

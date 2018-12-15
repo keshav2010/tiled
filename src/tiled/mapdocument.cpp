@@ -30,14 +30,13 @@
 #include "changeproperties.h"
 #include "changeselectedarea.h"
 #include "containerhelpers.h"
-#include "documentmanager.h"
+#include "editablemap.h"
 #include "flipmapobjects.h"
 #include "grouplayer.h"
 #include "hexagonalrenderer.h"
 #include "imagelayer.h"
 #include "isometricrenderer.h"
 #include "layermodel.h"
-#include "map.h"
 #include "mapobject.h"
 #include "mapobjectmodel.h"
 #include "movelayer.h"
@@ -54,6 +53,7 @@
 #include "resizetilelayer.h"
 #include "rotatemapobject.h"
 #include "staggeredrenderer.h"
+#include "templatemanager.h"
 #include "terrain.h"
 #include "tile.h"
 #include "tilelayer.h"
@@ -74,7 +74,6 @@ MapDocument::MapDocument(Map *map, const QString &fileName)
     , mMap(map)
     , mLayerModel(new LayerModel(this))
     , mHoveredMapObject(nullptr)
-    , mRenderer(nullptr)
     , mMapObjectModel(new MapObjectModel(this))
 {
     mCurrentObject = map;
@@ -96,27 +95,28 @@ MapDocument::MapDocument(Map *map, const QString &fileName)
 
     // Forward signals emitted from the map object model
     mMapObjectModel->setMapDocument(this);
-    connect(mMapObjectModel, SIGNAL(objectsAdded(QList<MapObject*>)),
-            SIGNAL(objectsAdded(QList<MapObject*>)));
-    connect(mMapObjectModel, SIGNAL(objectsChanged(QList<MapObject*>)),
-            SIGNAL(objectsChanged(QList<MapObject*>)));
-    connect(mMapObjectModel, SIGNAL(objectsTypeChanged(QList<MapObject*>)),
-            SIGNAL(objectsTypeChanged(QList<MapObject*>)));
-    connect(mMapObjectModel, SIGNAL(objectsRemoved(QList<MapObject*>)),
-            SLOT(onObjectsRemoved(QList<MapObject*>)));
+    connect(mMapObjectModel, &MapObjectModel::objectsAdded,
+            this, &MapDocument::objectsAdded);
+    connect(mMapObjectModel, &MapObjectModel::objectsChanged,
+            this, &MapDocument::objectsChanged);
+    connect(mMapObjectModel, &MapObjectModel::objectsTypeChanged,
+            this, &MapDocument::objectsTypeChanged);
+    connect(mMapObjectModel, &MapObjectModel::objectsRemoved,
+            this, &MapDocument::onObjectsRemoved);
 
-    connect(mMapObjectModel, SIGNAL(rowsInserted(QModelIndex,int,int)),
-            SLOT(onMapObjectModelRowsInserted(QModelIndex,int,int)));
-    connect(mMapObjectModel, SIGNAL(rowsRemoved(QModelIndex,int,int)),
-            SLOT(onMapObjectModelRowsInsertedOrRemoved(QModelIndex,int,int)));
-    connect(mMapObjectModel, SIGNAL(rowsMoved(QModelIndex,int,int,QModelIndex,int)),
-            SLOT(onObjectsMoved(QModelIndex,int,int,QModelIndex,int)));
+    connect(mMapObjectModel, &QAbstractItemModel::rowsInserted,
+            this, &MapDocument::onMapObjectModelRowsInserted);
+    connect(mMapObjectModel, &QAbstractItemModel::rowsRemoved,
+            this, &MapDocument::onMapObjectModelRowsInsertedOrRemoved);
+    connect(mMapObjectModel, &QAbstractItemModel::rowsMoved,
+            this, &MapDocument::onObjectsMoved);
+
+    connect(TemplateManager::instance(), &TemplateManager::objectTemplateChanged,
+            this, &MapDocument::updateTemplateInstances);
 }
 
 MapDocument::~MapDocument()
 {
-    delete mRenderer;
-    delete mMap;
 }
 
 bool MapDocument::save(const QString &fileName, QString *error)
@@ -138,9 +138,8 @@ bool MapDocument::save(const QString &fileName, QString *error)
     mLastSaved = QFileInfo(fileName).lastModified();
 
     // Mark TilesetDocuments for embedded tilesets as saved
-    auto documentManager = DocumentManager::instance();
     for (const SharedTileset &tileset : mMap->tilesets()) {
-        if (TilesetDocument *tilesetDocument = documentManager->findTilesetDocument(tileset))
+        if (TilesetDocument *tilesetDocument = TilesetDocument::findDocumentForTileset(tileset))
             if (tilesetDocument->isEmbedded())
                 tilesetDocument->setClean();
     }
@@ -149,19 +148,19 @@ bool MapDocument::save(const QString &fileName, QString *error)
     return true;
 }
 
-MapDocument *MapDocument::load(const QString &fileName,
-                               MapFormat *format,
-                               QString *error)
+MapDocumentPtr MapDocument::load(const QString &fileName,
+                                 MapFormat *format,
+                                 QString *error)
 {
     Map *map = format->read(fileName);
 
     if (!map) {
         if (error)
             *error = format->errorString();
-        return nullptr;
+        return MapDocumentPtr();
     }
 
-    MapDocument *document = new MapDocument(map, fileName);
+    MapDocumentPtr document = MapDocumentPtr::create(map, fileName);
     document->setReaderFormat(format);
     if (format->hasCapabilities(MapFormat::Write))
         document->setWriterFormat(format);
@@ -213,6 +212,14 @@ QString MapDocument::displayName() const
     return displayName;
 }
 
+EditableAsset *MapDocument::editable()
+{
+    if (!mEditableMap)
+        mEditableMap = new EditableMap(this, this);
+
+    return mEditableMap;
+}
+
 /**
   * Returns the sibling index of the given \a layer, or -1 if no layer is given.
   */
@@ -229,111 +236,25 @@ void MapDocument::setCurrentLayer(Layer *layer)
         return;
 
     mCurrentLayer = layer;
-    emit currentLayerChanged(mCurrentLayer);
+    emit currentLayerChanged(layer);
 
-    if (mCurrentLayer)
+    if (layer)
         if (!mCurrentObject || mCurrentObject->typeId() == Object::LayerType)
-            setCurrentObject(mCurrentLayer);
+            setCurrentObject(layer);
 }
 
 void MapDocument::setSelectedLayers(const QList<Layer *> &layers)
 {
+    if (mSelectedLayers == layers)
+        return;
+
     mSelectedLayers = layers;
     emit selectedLayersChanged();
 }
 
-/**
- * Custom intersects check necessary because QRectF::intersects wants a
- * non-empty area of overlap, but we should also consider overlap with empty
- * area as intersection.
- *
- * Results for rectangles with negative size are undefined.
- */
-static bool intersects(const QRectF &a, const QRectF &b)
-{
-    return a.right() >= b.left() &&
-            a.bottom() >= b.top() &&
-            a.left() <= b.right() &&
-            a.top() <= b.bottom();
-}
-
-static bool visibleIn(const QRectF &area, MapObject *object,
-                      MapRenderer *renderer)
-{
-    QRectF boundingRect = renderer->boundingRect(object);
-
-    if (object->rotation() != 0) {
-        // Rotate around object position
-        QPointF pos = renderer->pixelToScreenCoords(object->position());
-        boundingRect.translate(-pos);
-
-        QTransform transform;
-        transform.rotate(object->rotation());
-        boundingRect = transform.mapRect(boundingRect);
-
-        boundingRect.translate(pos);
-    }
-
-    return intersects(area, boundingRect);
-}
-
 void MapDocument::resizeMap(const QSize &size, const QPoint &offset, bool removeObjects)
 {
-    const QRegion movedSelection = mSelectedArea.translated(offset);
-    const QRect newArea = QRect(-offset, size);
-    const QRectF visibleArea = mRenderer->boundingRect(newArea);
-
-    const QPointF origin = mRenderer->tileToPixelCoords(QPointF());
-    const QPointF newOrigin = mRenderer->tileToPixelCoords(-offset);
-    const QPointF pixelOffset = origin - newOrigin;
-
-    // Resize the map and each layer
-    QUndoCommand *command = new QUndoCommand(tr("Resize Map"));
-
-    LayerIterator iterator(mMap);
-    while (Layer *layer = iterator.next()) {
-        switch (layer->layerType()) {
-        case Layer::TileLayerType: {
-            TileLayer *tileLayer = static_cast<TileLayer*>(layer);
-            new ResizeTileLayer(this, tileLayer, size, offset, command);
-            break;
-        }
-        case Layer::ObjectGroupType: {
-            ObjectGroup *objectGroup = static_cast<ObjectGroup*>(layer);
-
-            for (MapObject *o : objectGroup->objects()) {
-                if (removeObjects && !visibleIn(visibleArea, o, mRenderer)) {
-                    // Remove objects that will fall outside of the map
-                    new RemoveMapObject(this, o, command);
-                } else {
-                    QPointF oldPos = o->position();
-                    QPointF newPos = oldPos + pixelOffset;
-                    new MoveMapObject(this, o, newPos, oldPos, command);
-                }
-            }
-            break;
-        }
-        case Layer::ImageLayerType: {
-            // Adjust image layer by changing its offset
-            auto imageLayer = static_cast<ImageLayer*>(layer);
-            new SetLayerOffset(this, layer,
-                               imageLayer->offset() + pixelOffset,
-                               command);
-            break;
-        }
-        case Layer::GroupLayerType: {
-            // Recursion handled by LayerIterator
-            break;
-        }
-        }
-    }
-
-    new ResizeMap(this, size, command);
-    new ChangeSelectedArea(this, movedSelection, command);
-
-    mUndoStack->push(command);
-
-    // TODO: Handle layers that don't match the map size correctly
+    static_cast<EditableMap*>(editable())->resize(size, offset, removeObjects);
 }
 
 void MapDocument::autocropMap()
@@ -358,12 +279,12 @@ void MapDocument::offsetMap(const QList<Layer*> &layers,
     if (layers.empty())
         return;
 
-    mUndoStack->beginMacro(tr("Offset Map"));
+    undoStack()->beginMacro(tr("Offset Map"));
     for (auto layer : layers) {
-        mUndoStack->push(new OffsetLayer(this, layer, offset,
-                                         bounds, wrapX, wrapY));
+        undoStack()->push(new OffsetLayer(this, layer, offset,
+                                          bounds, wrapX, wrapY));
     }
-    mUndoStack->endMacro();
+    undoStack()->endMacro();
 }
 
 /**
@@ -374,7 +295,7 @@ void MapDocument::flipSelectedObjects(FlipDirection direction)
     if (mSelectedObjects.isEmpty())
         return;
 
-    mUndoStack->push(new FlipMapObjects(this, mSelectedObjects, direction));
+    undoStack()->push(new FlipMapObjects(this, mSelectedObjects, direction));
 }
 
 /**
@@ -385,8 +306,8 @@ void MapDocument::rotateSelectedObjects(RotateDirection direction)
     if (mSelectedObjects.isEmpty())
         return;
 
-    mUndoStack->beginMacro(tr("Rotate %n Object(s)", "",
-                              mSelectedObjects.size()));
+    undoStack()->beginMacro(tr("Rotate %n Object(s)", "",
+                               mSelectedObjects.size()));
 
     // TODO: Rotate them properly as a group
     const auto &selectedObjects = mSelectedObjects;
@@ -404,10 +325,10 @@ void MapDocument::rotateSelectedObjects(RotateDirection direction)
                 newRotation -= 360;
         }
 
-        mUndoStack->push(new RotateMapObject(this, mapObject,
-                                             newRotation, oldRotation));
+        undoStack()->push(new RotateMapObject(this, mapObject,
+                                              newRotation, oldRotation));
     }
-    mUndoStack->endMacro();
+    undoStack()->endMacro();
 }
 
 /**
@@ -441,7 +362,7 @@ Layer *MapDocument::addLayer(Layer::TypeFlag layerType)
 
     auto parentLayer = mCurrentLayer ? mCurrentLayer->parentLayer() : nullptr;
     const int index = layerIndex(mCurrentLayer) + 1;
-    mUndoStack->push(new AddLayer(this, index, layer, parentLayer));
+    undoStack()->push(new AddLayer(this, index, layer, parentLayer));
     setCurrentLayer(layer);
 
     emit editLayerNameRequested();
@@ -449,162 +370,294 @@ Layer *MapDocument::addLayer(Layer::TypeFlag layerType)
     return layer;
 }
 
-/**
- * Creates a new group layer, putting the given \a layer inside the group.
- */
-void MapDocument::groupLayer(Layer *layer)
+void MapDocument::groupLayers(const QList<Layer *> &layers)
 {
-    if (!layer)
+    if (layers.isEmpty())
         return;
 
-    Q_ASSERT(layer->map() == mMap);
+    const auto parentLayer = layers.first()->parentLayer();
+    const int index = layers.first()->siblingIndex() + 1;
 
-    QString name = tr("Group %1").arg(mMap->groupLayerCount() + 1);
-    auto groupLayer = new GroupLayer(name, 0, 0);
-    auto parentLayer = layer->parentLayer();
-    const int index = layer->siblingIndex() + 1;
-    mUndoStack->beginMacro(tr("Group Layer"));
-    mUndoStack->push(new AddLayer(this, index, groupLayer, parentLayer));
-    mUndoStack->push(new ReparentLayers(this, QList<Layer*>() << layer, groupLayer, 0));
-    mUndoStack->endMacro();
-}
+    for (Layer *layer : layers) {
+        Q_ASSERT(layer->map() == mMap.get());
 
-/**
- * Ungroups the given \a layer. If the layer itself is a group layer, then this
- * group is ungrouped. Otherwise, if the layer is part of a group layer, then
- * it is removed from the group.
- */
-void MapDocument::ungroupLayer(Layer *layer)
-{
-    if (!layer)
-        return;
-
-    GroupLayer *groupLayer = layer->asGroupLayer();
-    QList<Layer *> layers;
-
-    if (groupLayer) {
-        layers = groupLayer->layers();
-    } else if (layer->parentLayer()) {
-        layers.append(layer);
-        groupLayer = layer->parentLayer();
-    } else {
-        // No ungrouping possible
-        return;
+        // If any of the layers to be grouped is a GroupLayer, make sure we
+        // do not try to move it into one of its own children.
+        if (layer->isGroupLayer() && parentLayer && parentLayer->isParentOrSelf(layer))
+            return;
     }
 
-    GroupLayer *targetParent = groupLayer->parentLayer();
-    int groupIndex = groupLayer->siblingIndex();
-
-    mUndoStack->beginMacro(tr("Ungroup Layer"));
-    mUndoStack->push(new ReparentLayers(this, layers, targetParent, groupIndex + 1));
-
-    if (groupLayer->layerCount() == 0)
-        mUndoStack->push(new RemoveLayer(this, groupIndex, targetParent));
-
-    mUndoStack->endMacro();
+    const QString name = tr("Group %1").arg(mMap->groupLayerCount() + 1);
+    auto groupLayer = new GroupLayer(name, 0, 0);
+    undoStack()->beginMacro(tr("Group %n Layer(s)", "", layers.size()));
+    undoStack()->push(new AddLayer(this, index, groupLayer, parentLayer));
+    undoStack()->push(new ReparentLayers(this, layers, groupLayer, 0));
+    undoStack()->endMacro();
 }
 
 /**
- * Duplicates the currently selected layer.
+ * Ungroups the given list of \a layers. If the layer itself is a group layer,
+ * then this group is ungrouped. Otherwise, if the layer is part of a group
+ * layer, then it is removed from the group.
  */
-void MapDocument::duplicateLayer()
+void MapDocument::ungroupLayers(const QList<Layer *> &layers)
 {
-    if (!mCurrentLayer)
+    if (layers.isEmpty())
         return;
 
-    Layer *duplicate = mCurrentLayer->clone();
-    duplicate->setName(tr("Copy of %1").arg(duplicate->name()));
+    undoStack()->beginMacro(tr("Ungroup %n Layer(s)", "", layers.size()));
 
-    if (duplicate->layerType() == Layer::ObjectGroupType)
-        static_cast<ObjectGroup*>(duplicate)->resetObjectIds();
+    // Copy needed because while ungrouping the original list may get modified.
+    // Also, we may need to remove group layers from this list if they get
+    // removed due to becoming empty.
+    auto layersToUngroup = layers;
 
-    auto parentLayer = mCurrentLayer ? mCurrentLayer->parentLayer() : nullptr;
-    const int index = layerIndex(mCurrentLayer) + 1;
-    QUndoCommand *cmd = new AddLayer(this, index, duplicate, parentLayer);
-    cmd->setText(tr("Duplicate Layer"));
-    mUndoStack->push(cmd);
-    setCurrentLayer(duplicate);
+    while (!layersToUngroup.isEmpty()) {
+        Layer *layer = layersToUngroup.takeFirst();
+
+        GroupLayer *groupLayer = layer->asGroupLayer();
+        QList<Layer *> layersToReparent;
+
+        if (groupLayer) {
+            layersToReparent = groupLayer->layers();
+        } else if (layer->parentLayer()) {
+            layersToReparent.append(layer);
+            groupLayer = layer->parentLayer();
+        } else {
+            // No ungrouping possible
+            continue;
+        }
+
+        GroupLayer *targetParent = groupLayer->parentLayer();
+        int groupIndex = groupLayer->siblingIndex();
+
+        if (!layersToReparent.isEmpty())
+            undoStack()->push(new ReparentLayers(this, layersToReparent, targetParent, groupIndex + 1));
+
+        if (groupLayer->layerCount() == 0) {
+            undoStack()->push(new RemoveLayer(this, groupIndex, targetParent));
+            layersToUngroup.removeOne(groupLayer);
+        }
+    }
+
+    undoStack()->endMacro();
 }
 
 /**
- * Merges the currently selected layer with the layer below. This only works
- * when the layers can be merged.
+ * Duplicates the currently selected layers.
+ */
+void MapDocument::duplicateLayers(const QList<Layer *> &layers)
+{
+    if (layers.isEmpty())
+        return;
+
+    undoStack()->beginMacro(tr("Duplicate %n Layer(s)", "", layers.size()));
+
+    QList<Layer *> layersToDuplicate;
+
+    // Duplicate layers in the right order (groups before their children)
+    LayerIterator iterator(mMap.get());
+    iterator.toBack();
+    while (Layer *layer = iterator.previous())
+        if (layers.contains(layer))
+            layersToDuplicate.append(layer);
+
+    QList<Layer *> newLayers;
+    GroupLayer *previousParentLayer = nullptr;
+    int previousIndex = 0;
+
+    while (!layersToDuplicate.isEmpty()) {
+        Layer *layer = layersToDuplicate.takeFirst();
+
+        // If a group layer gets duplicated, make sure any children are removed
+        // from the remaining list of layers to duplicate
+        if (layer->isGroupLayer()) {
+            for (int i = layersToDuplicate.size() - 1; i >= 0; --i)
+                if (layersToDuplicate.at(i)->isParentOrSelf(layer))
+                    layersToDuplicate.removeAt(i);
+        }
+
+        Layer *duplicate = layer->clone();
+        duplicate->setName(tr("Copy of %1").arg(duplicate->name()));
+
+        if (duplicate->layerType() == Layer::ObjectGroupType)
+            static_cast<ObjectGroup*>(duplicate)->resetObjectIds();
+
+        auto parentLayer = layer->parentLayer();
+
+        int index = previousIndex;
+        if (newLayers.isEmpty() || previousParentLayer != parentLayer)
+            index = layer->siblingIndex() + 1;
+
+        undoStack()->push(new AddLayer(this, index, duplicate, parentLayer));
+
+        previousParentLayer = parentLayer;
+        previousIndex = index;
+
+        newLayers.append(duplicate);
+    }
+
+    undoStack()->endMacro();
+
+    setCurrentLayer(newLayers.first());
+    setSelectedLayers(newLayers);
+}
+
+/**
+ * Merges the given \a layers down, each to the layer directly below them.
+ * Layers that can't be merged down are skipped.
  *
- * \see Layer::canMergeWith
+ * \see Layer::canMergeDown
  */
-void MapDocument::mergeLayerDown()
+void MapDocument::mergeLayersDown(const QList<Layer *> &layers)
 {
-    auto parentLayer = mCurrentLayer ? mCurrentLayer->parentLayer() : nullptr;
-    const int index = layerIndex(mCurrentLayer);
+    QList<Layer *> layersToMerge;
 
-    if (index < 1)
+    for (Layer *layer : layers)
+        if (layer->canMergeDown())
+            layersToMerge.append(layer);
+
+    if (layersToMerge.isEmpty())
         return;
 
-    Layer *lowerLayer = mCurrentLayer->siblings().at(index - 1);
+    undoStack()->beginMacro(tr("Merge Layer Down")); // todo: support plural after string-freeze
 
-    if (!lowerLayer->canMergeWith(mCurrentLayer))
+    Layer *lastMergedLayer = nullptr;
+
+    while (!layersToMerge.isEmpty()) {
+        Layer *layer = layersToMerge.takeFirst();
+
+        const int index = layer->siblingIndex();
+        Q_ASSERT(index >= 1);
+
+        Layer *lowerLayer = layer->siblings().at(index - 1);
+        Layer *merged = lowerLayer->mergedWith(layer);
+        GroupLayer *parentLayer = layer->parentLayer();
+
+        undoStack()->push(new AddLayer(this, index - 1, merged, parentLayer));
+        undoStack()->push(new RemoveLayer(this, index, parentLayer));
+        undoStack()->push(new RemoveLayer(this, index, parentLayer));
+
+        // If the layer we've merged with was also scheduled to get merged down,
+        // we need to update the pointer to the new layer.
+        int lowerLayerIndex = layersToMerge.indexOf(lowerLayer);
+        if (lowerLayerIndex != -1)
+            layersToMerge[lowerLayerIndex] = merged;
+
+        lastMergedLayer = merged;
+    }
+
+    undoStack()->endMacro();
+
+    setCurrentLayer(lastMergedLayer);
+    setSelectedLayers({ lastMergedLayer });
+}
+
+/**
+ * Moves the given \a layers up, when it is not already at the top of the map.
+ */
+void MapDocument::moveLayersUp(const QList<Layer *> &layers)
+{
+    QList<Layer *> layersToMove;
+    layersToMove.reserve(layers.size());
+
+    // Move layers in the right order, and abort if one of the layers can't be
+    // moved (iterating backwards because when moving layers up we need to
+    // start moving the top-most layer first)
+    LayerIterator iterator(mMap.get());
+    iterator.toBack();
+    while (Layer *layer = iterator.previous()) {
+        if (layers.contains(layer)) {
+            if (!MoveLayer::canMoveUp(*layer))
+                return;
+
+            layersToMove.append(layer);
+        }
+    }
+
+    if (layersToMove.isEmpty())
         return;
 
-    Layer *merged = lowerLayer->mergedWith(mCurrentLayer);
-
-    mUndoStack->beginMacro(tr("Merge Layer Down"));
-    mUndoStack->push(new AddLayer(this, index - 1, merged, parentLayer));
-    mUndoStack->push(new RemoveLayer(this, index, parentLayer));
-    mUndoStack->push(new RemoveLayer(this, index, parentLayer));
-    mUndoStack->endMacro();
+    undoStack()->beginMacro(QCoreApplication::translate("Undo Commands", "Raise %n Layer(s)", "", layersToMove.size()));
+    for (Layer *layer : qAsConst(layersToMove))
+        undoStack()->push(new MoveLayer(this, layer, MoveLayer::Up));
+    undoStack()->endMacro();
 }
 
 /**
- * Moves the given \a layer up, when it is not already at the top of the map.
+ * Moves the given \a layers up, when it is not already at the bottom of the map.
  */
-void MapDocument::moveLayerUp(Layer *layer)
+void MapDocument::moveLayersDown(const QList<Layer *> &layers)
 {
-    if (!layer || !MoveLayer::canMoveUp(*layer))
+    QList<Layer *> layersToMove;
+    layersToMove.reserve(layers.size());
+
+    // Move layers in the right order, and abort if one of the layers can't be moved
+    for (Layer *layer : mMap->allLayers()) {
+        if (layers.contains(layer)) {
+            if (!MoveLayer::canMoveDown(*layer))
+                return;
+
+            layersToMove.append(layer);
+        }
+    }
+
+    if (layersToMove.isEmpty())
         return;
 
-    mUndoStack->push(new MoveLayer(this, layer, MoveLayer::Up));
+    undoStack()->beginMacro(QCoreApplication::translate("Undo Commands", "Lower %n Layer(s)", "", layersToMove.size()));
+    for (Layer *layer : qAsConst(layersToMove))
+        undoStack()->push(new MoveLayer(this, layer, MoveLayer::Down));
+    undoStack()->endMacro();
 }
 
 /**
- * Moves the given \a layer up, when it is not already at the bottom of the map.
+ * Removes the given \a layers.
  */
-void MapDocument::moveLayerDown(Layer *layer)
+void MapDocument::removeLayers(const QList<Layer *> &layers)
 {
-    if (!layer || !MoveLayer::canMoveDown(*layer))
+    if (layers.isEmpty())
         return;
 
-    mUndoStack->push(new MoveLayer(this, layer, MoveLayer::Down));
+    undoStack()->beginMacro(tr("Remove %n Layer(s)", "", layers.size()));
+
+    // Copy needed because while removing the original list may get modified
+    auto layersToRemove = layers;
+
+    while (!layersToRemove.isEmpty()) {
+        Layer *layer = layersToRemove.takeFirst();
+        Q_ASSERT(layer->map() == mMap.get());
+
+        undoStack()->push(new RemoveLayer(this,
+                                          layer->siblingIndex(),
+                                          layer->parentLayer()));
+
+        // If a group layer gets removed, make sure any children are removed
+        // from the remaining list of layers to remove
+        if (layer->isGroupLayer()) {
+            for (int i = layersToRemove.size() - 1; i >= 0; --i)
+                if (layersToRemove.at(i)->isParentOrSelf(layer))
+                    layersToRemove.removeAt(i);
+        }
+    }
+
+    undoStack()->endMacro();
 }
 
 /**
- * Removes the given \a layer.
+ * \see LayerModel::toggleOtherLayers
  */
-void MapDocument::removeLayer(Layer *layer)
+void MapDocument::toggleOtherLayers(const QList<Layer *> &layers)
 {
-    Q_ASSERT(layer->map() == mMap);
-    mUndoStack->push(new RemoveLayer(this,
-                                     layer->siblingIndex(),
-                                     layer->parentLayer()));
+    mLayerModel->toggleOtherLayers(layers);
 }
 
 /**
-  * Show or hide all other layers except the given \a layer.
-  * If any other layer is visible then all layers will be hidden, otherwise
-  * the layers will be shown.
-  */
-void MapDocument::toggleOtherLayers(Layer *layer)
+ * \see LayerModel::toggleLockOtherLayers
+ */
+void MapDocument::toggleLockOtherLayers(const QList<Layer *> &layers)
 {
-    mLayerModel->toggleOtherLayers(layer);
-}
-
-/**
-* Lock or unlock all other layers except the given \a layer.
-* If any other layer is unlocked then all layers will be locked, otherwise
-* the layers will be unlocked.
-*/
-void MapDocument::toggleLockOtherLayers(Layer *layer)
-{
-    mLayerModel->toggleLockOtherLayers(layer);
+    mLayerModel->toggleLockOtherLayers(layers);
 }
 
 
@@ -763,12 +816,12 @@ void MapDocument::setSelectedArea(const QRegion &selection)
     }
 }
 
-static QList<MapObject *> sortObjects(const Map *map, const QList<MapObject *> &objects)
+static QList<MapObject *> sortObjects(const Map &map, const QList<MapObject *> &objects)
 {
     QList<MapObject *> sorted;
     sorted.reserve(objects.size());
 
-    LayerIterator iterator(map);
+    LayerIterator iterator(&map);
     while (Layer *layer = iterator.next()) {
         if (layer->layerType() != Layer::ObjectGroupType)
             continue;
@@ -788,7 +841,7 @@ static QList<MapObject *> sortObjects(const Map *map, const QList<MapObject *> &
  */
 QList<MapObject *> MapDocument::selectedObjectsOrdered() const
 {
-    return sortObjects(mMap, mSelectedObjects);
+    return sortObjects(*mMap, mSelectedObjects);
 }
 
 void MapDocument::setSelectedObjects(const QList<MapObject *> &selectedObjects)
@@ -819,11 +872,27 @@ void MapDocument::setSelectedObjects(const QList<MapObject *> &selectedObjects)
 
 QList<Object*> MapDocument::currentObjects() const
 {
-    if (mCurrentObject && mCurrentObject->typeId() == Object::MapObjectType && !mSelectedObjects.isEmpty()) {
-        QList<Object*> objects;
-        for (MapObject *mapObj : mSelectedObjects)
-            objects.append(mapObj);
-        return objects;
+    if (mCurrentObject) {
+        switch (mCurrentObject->typeId()) {
+        case Object::MapObjectType:
+            if (!mSelectedObjects.isEmpty()) {
+                QList<Object*> objects;
+                for (MapObject *mapObj : mSelectedObjects)
+                    objects.append(mapObj);
+                return objects;
+            }
+            break;
+        case Object::LayerType:
+            if (!mSelectedLayers.isEmpty()) {
+                QList<Object*> objects;
+                for (Layer *layer : mSelectedLayers)
+                    objects.append(layer);
+                return objects;
+            }
+            break;
+        default:
+            break;
+        }
     }
 
     return Document::currentObjects();
@@ -881,11 +950,11 @@ void MapDocument::unifyTilesets(Map *map)
     }
 
     if (!undoCommands.isEmpty()) {
-        mUndoStack->beginMacro(tr("Tileset Changes"));
+        undoStack()->beginMacro(tr("Tileset Changes"));
         const auto &commands = undoCommands;
         for (QUndoCommand *command : commands)
-            mUndoStack->push(command);
-        mUndoStack->endMacro();
+            undoStack()->push(command);
+        undoStack()->endMacro();
     }
 }
 
@@ -920,6 +989,16 @@ void MapDocument::unifyTilesets(Map *map, QVector<SharedTileset> &missingTileset
         // replacement tileset found, change given map
         map->replaceTileset(tileset, replacement);
     }
+}
+
+bool MapDocument::templateAllowed(const ObjectTemplate *objectTemplate) const
+{
+    if (!objectTemplate->object())
+        return false;
+    if (objectTemplate->object()->isTileObject() && !mAllowTileObjects)
+        return false;
+
+    return true;
 }
 
 /**
@@ -1029,14 +1108,21 @@ void MapDocument::onLayerRemoved(Layer *layer)
         setCurrentLayer(nullptr);
     }
 
+    // Make sure affected layers are removed from the selection
+    auto selectedLayers = mSelectedLayers;
+    for (int i = selectedLayers.size() - 1; i >= 0; --i)
+        if (selectedLayers.at(i)->isParentOrSelf(layer))
+            selectedLayers.removeAt(i);
+    setSelectedLayers(selectedLayers);
+
     emit layerRemoved(layer);
 }
 
 void MapDocument::updateTemplateInstances(const ObjectTemplate *objectTemplate)
 {
     QList<MapObject*> objectList;
-    for (ObjectGroup *group : mMap->objectGroups()) {
-        for (auto object : group->objects()) {
+    for (Layer *layer : mMap->objectGroups()) {
+        for (auto object : static_cast<ObjectGroup*>(layer)->objects()) {
             if (object->objectTemplate() == objectTemplate) {
                 object->syncWithTemplate();
                 objectList.append(object);
@@ -1049,13 +1135,20 @@ void MapDocument::updateTemplateInstances(const ObjectTemplate *objectTemplate)
 void MapDocument::selectAllInstances(const ObjectTemplate *objectTemplate)
 {
     QList<MapObject*> objectList;
-    for (ObjectGroup *group : mMap->objectGroups())
-        for (auto object : group->objects())
+    for (Layer *layer : mMap->objectGroups()) {
+        for (auto object : static_cast<ObjectGroup*>(layer)->objects())
             if (object->objectTemplate() == objectTemplate)
                 objectList.append(object);
+    }
     setSelectedObjects(objectList);
 }
 
+/**
+ * Deselects the given list of \a objects.
+ *
+ * If any of the given objects is the "current" object, the current object
+ * is reset as well.
+ */
 void MapDocument::deselectObjects(const QList<MapObject *> &objects)
 {
     // Unset the current object when it was part of this list of objects
@@ -1076,20 +1169,21 @@ void MapDocument::duplicateObjects(const QList<MapObject *> &objects)
     if (objects.isEmpty())
         return;
 
-    mUndoStack->beginMacro(tr("Duplicate %n Object(s)", "", objects.size()));
+    QVector<AddMapObjects::Entry> objectsToAdd;
+    objectsToAdd.reserve(objects.size());
 
-    QList<MapObject*> clones;
     for (const MapObject *mapObject : objects) {
         MapObject *clone = mapObject->clone();
         clone->resetId();
-        clones.append(clone);
-        mUndoStack->push(new AddMapObject(this,
-                                          mapObject->objectGroup(),
-                                          clone));
+        objectsToAdd.append(AddMapObjects::Entry { clone, mapObject->objectGroup() });
     }
 
-    mUndoStack->endMacro();
-    setSelectedObjects(clones);
+    auto command = new AddMapObjects(this, objectsToAdd);
+    command->setText(tr("Duplicate %n Object(s)", "", objects.size()));
+
+    undoStack()->push(command);
+
+    setSelectedObjects(AddMapObjects::objects(objectsToAdd));
 }
 
 void MapDocument::removeObjects(const QList<MapObject *> &objects)
@@ -1097,11 +1191,10 @@ void MapDocument::removeObjects(const QList<MapObject *> &objects)
     if (objects.isEmpty())
         return;
 
-    mUndoStack->beginMacro(tr("Remove %n Object(s)", "", objects.size()));
-    const auto objectsCopy = objects;   // original list may get modified
-    for (MapObject *mapObject : objectsCopy)
-        mUndoStack->push(new RemoveMapObject(this, mapObject));
-    mUndoStack->endMacro();
+    auto command = new RemoveMapObjects(this, objects);
+    command->setText(tr("Remove %n Object(s)", "", objects.size()));
+
+    undoStack()->push(command);
 }
 
 void MapDocument::moveObjectsToGroup(const QList<MapObject *> &objects,
@@ -1110,19 +1203,19 @@ void MapDocument::moveObjectsToGroup(const QList<MapObject *> &objects,
     if (objects.isEmpty())
         return;
 
-    mUndoStack->beginMacro(tr("Move %n Object(s) to Layer", "",
-                              objects.size()));
+    undoStack()->beginMacro(tr("Move %n Object(s) to Layer", "",
+                               objects.size()));
 
-    const auto objectsToMove = sortObjects(mMap, objects);
+    const auto objectsToMove = sortObjects(*mMap, objects);
     for (MapObject *mapObject : objectsToMove) {
         if (mapObject->objectGroup() == objectGroup)
             continue;
 
-        mUndoStack->push(new MoveMapObjectToGroup(this,
-                                                  mapObject,
-                                                  objectGroup));
+        undoStack()->push(new MoveMapObjectToGroup(this,
+                                                   mapObject,
+                                                   objectGroup));
     }
-    mUndoStack->endMacro();
+    undoStack()->endMacro();
 }
 
 typedef QMap<ObjectGroup*, RangeSet<int>>           Ranges;
@@ -1148,8 +1241,8 @@ void MapDocument::moveObjectsUp(const QList<MapObject *> &objects)
 
     const auto ranges = computeRanges(objects);
 
-    QScopedPointer<QUndoCommand> command(new QUndoCommand(tr("Move %n Object(s) Up",
-                                                             "", objects.size())));
+    std::unique_ptr<QUndoCommand> command(new QUndoCommand(tr("Move %n Object(s) Up",
+                                                              "", objects.size())));
 
     RangesIterator rangesIterator(ranges);
     while (rangesIterator.hasNext()) {
@@ -1170,13 +1263,13 @@ void MapDocument::moveObjectsUp(const QList<MapObject *> &objects)
             int to = from + count + 1;
 
             if (to <= group->objectCount())
-                new ChangeMapObjectsOrder(this, group, from, to, count, command.data());
+                new ChangeMapObjectsOrder(this, group, from, to, count, command.get());
 
         } while (it != it_begin);
     }
 
     if (command->childCount() > 0)
-        mUndoStack->push(command.take());
+        undoStack()->push(command.release());
 }
 
 void MapDocument::moveObjectsDown(const QList<MapObject *> &objects)
@@ -1184,8 +1277,8 @@ void MapDocument::moveObjectsDown(const QList<MapObject *> &objects)
     if (objects.isEmpty())
         return;
 
-    QScopedPointer<QUndoCommand> command(new QUndoCommand(tr("Move %n Object(s) Down",
-                                                             "", objects.size())));
+    std::unique_ptr<QUndoCommand> command(new QUndoCommand(tr("Move %n Object(s) Down",
+                                                              "", objects.size())));
 
     RangesIterator rangesIterator(computeRanges(objects));
     while (rangesIterator.hasNext()) {
@@ -1204,13 +1297,13 @@ void MapDocument::moveObjectsDown(const QList<MapObject *> &objects)
                 int to = from - 1;
                 int count = it.length();
 
-                new ChangeMapObjectsOrder(this, group, from, to, count, command.data());
+                new ChangeMapObjectsOrder(this, group, from, to, count, command.get());
             }
         }
     }
 
     if (command->childCount() > 0)
-        mUndoStack->push(command.take());
+        undoStack()->push(command.release());
 }
 
 void MapDocument::detachObjects(const QList<MapObject *> &objects)
@@ -1218,26 +1311,23 @@ void MapDocument::detachObjects(const QList<MapObject *> &objects)
     if (objects.isEmpty())
         return;
 
-    mUndoStack->push(new DetachObjects(this, objects));
+    undoStack()->push(new DetachObjects(this, objects));
 }
 
 void MapDocument::createRenderer()
 {
-    if (mRenderer)
-        delete mRenderer;
-
     switch (mMap->orientation()) {
     case Map::Isometric:
-        mRenderer = new IsometricRenderer(mMap);
+        mRenderer.reset(new IsometricRenderer(mMap.get()));
         break;
     case Map::Staggered:
-        mRenderer = new StaggeredRenderer(mMap);
+        mRenderer.reset(new StaggeredRenderer(mMap.get()));
         break;
     case Map::Hexagonal:
-        mRenderer = new HexagonalRenderer(mMap);
+        mRenderer.reset(new HexagonalRenderer(mMap.get()));
         break;
     default:
-        mRenderer = new OrthogonalRenderer(mMap);
+        mRenderer.reset(new OrthogonalRenderer(mMap.get()));
         break;
     }
 }

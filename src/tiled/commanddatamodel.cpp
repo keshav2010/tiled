@@ -24,6 +24,8 @@
 #include <QKeySequence>
 #include <QMimeData>
 
+#include "qtcompat_p.h"
+
 using namespace Tiled;
 using namespace Tiled::Internal;
 
@@ -68,7 +70,7 @@ void CommandDataModel::commit()
 {
     // Save command list
     QList<QVariant> commands;
-    foreach (const Command &command, mCommands)
+    for (const Command &command : qAsConst(mCommands))
         commands.append(command.toQVariant());
     mSettings.setValue(QLatin1String("commandList"), commands);
 }
@@ -87,7 +89,7 @@ bool CommandDataModel::removeRows(int row, int count, const QModelIndex &parent)
     if (row < 0 || row + count > mCommands.size())
         return false;
 
-    beginRemoveRows(parent, row, row + count);
+    beginRemoveRows(parent, row, row + count - 1);
     mCommands.erase(mCommands.begin() + row, mCommands.begin() + row + count);
     endRemoveRows();
 

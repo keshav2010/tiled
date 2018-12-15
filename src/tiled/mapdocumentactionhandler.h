@@ -75,13 +75,13 @@ public:
     QAction *actionGroupLayers() const { return mActionGroupLayers; }
     QAction *actionUngroupLayers() const { return mActionUngroupLayers; }
 
-    QAction *actionDuplicateLayer() const { return mActionDuplicateLayer; }
-    QAction *actionMergeLayerDown() const { return mActionMergeLayerDown; }
-    QAction *actionRemoveLayer() const { return mActionRemoveLayer; }
+    QAction *actionDuplicateLayers() const { return mActionDuplicateLayers; }
+    QAction *actionMergeLayersDown() const { return mActionMergeLayersDown; }
+    QAction *actionRemoveLayers() const { return mActionRemoveLayers; }
     QAction *actionSelectPreviousLayer() const { return mActionSelectPreviousLayer; }
     QAction *actionSelectNextLayer() const { return mActionSelectNextLayer; }
-    QAction *actionMoveLayerUp() const { return mActionMoveLayerUp; }
-    QAction *actionMoveLayerDown() const { return mActionMoveLayerDown; }
+    QAction *actionMoveLayersUp() const { return mActionMoveLayersUp; }
+    QAction *actionMoveLayersDown() const { return mActionMoveLayersDown; }
     QAction *actionToggleOtherLayers() const { return mActionToggleOtherLayers; }
     QAction *actionToggleLockOtherLayers() const { return mActionToggleLockOtherLayers; }
     QAction *actionLayerProperties() const { return mActionLayerProperties; }
@@ -119,13 +119,13 @@ public slots:
     void groupLayers();
     void ungroupLayers();
 
-    void duplicateLayer();
-    void mergeLayerDown();
+    void duplicateLayers();
+    void mergeLayersDown();
     void selectPreviousLayer();
     void selectNextLayer();
-    void moveLayerUp();
-    void moveLayerDown();
-    void removeLayer();
+    void moveLayersUp();
+    void moveLayersDown();
+    void removeLayers();
     void toggleOtherLayers();
     void toggleLockOtherLayers();
     void layerProperties();
@@ -157,13 +157,13 @@ private:
     QAction *mActionGroupLayers;
     QAction *mActionUngroupLayers;
 
-    QAction *mActionDuplicateLayer;
-    QAction *mActionMergeLayerDown;
-    QAction *mActionRemoveLayer;
+    QAction *mActionDuplicateLayers;
+    QAction *mActionMergeLayersDown;
+    QAction *mActionRemoveLayers;
     QAction *mActionSelectPreviousLayer;
     QAction *mActionSelectNextLayer;
-    QAction *mActionMoveLayerUp;
-    QAction *mActionMoveLayerDown;
+    QAction *mActionMoveLayersUp;
+    QAction *mActionMoveLayersDown;
     QAction *mActionToggleOtherLayers;
     QAction *mActionToggleLockOtherLayers;
     QAction *mActionLayerProperties;

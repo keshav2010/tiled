@@ -63,6 +63,8 @@ typedef QSharedPointer<Tileset> SharedTileset;
  */
 class TILEDSHARED_EXPORT Tileset : public Object
 {
+    Q_OBJECT
+
 public:
     /**
      * The orientation of the tileset determines the projection used in the
@@ -165,6 +167,9 @@ public:
 
     const QUrl &imageSource() const;
     void setImageSource(const QUrl &imageSource);
+    void setImageSource(const QString &url);
+    QString imageSourceString() const;
+
     bool isCollection() const;
 
     int columnCountForWidth(int width) const;
@@ -512,14 +517,6 @@ inline void Tileset::setBackgroundColor(QColor color)
 }
 
 /**
- * Convenience override that loads the image using the QImage constructor.
- */
-inline bool Tileset::loadFromImage(const QString &fileName)
-{
-    return loadFromImage(QImage(fileName), QUrl::fromLocalFile(fileName));
-}
-
-/**
  * Returns the URL of the external image that contains the tiles in
  * this tileset. Is an empty string when this tileset doesn't have a
  * tileset image.
@@ -527,6 +524,15 @@ inline bool Tileset::loadFromImage(const QString &fileName)
 inline const QUrl &Tileset::imageSource() const
 {
     return mImageReference.source;
+}
+
+/**
+ * QString-API for Python.
+ */
+inline QString Tileset::imageSourceString() const
+{
+    const QUrl &url = imageSource();
+    return url.isLocalFile() ? url.toLocalFile() : url.toString();
 }
 
 /**

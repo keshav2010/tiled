@@ -37,38 +37,24 @@ CreatePointObjectTool::CreatePointObjectTool(QObject *parent)
     icon.addFile(QLatin1String(":images/48x48/insert-point.png"));
     setIcon(icon);
     Utils::setThemeIcon(this, "insert-point");
+<<<<<<< HEAD
     mToolInfo = tr("<b>Click</b> on the map to position a point object.");
     languageChanged();
+=======
+    languageChangedImpl();
+>>>>>>> 4a3496224dea749224cad47a5d0de3c7800a060d
 }
 
 void CreatePointObjectTool::languageChanged()
 {
+    CreateObjectTool::languageChanged();
+    languageChangedImpl();
+}
+
+void CreatePointObjectTool::languageChangedImpl()
+{
     setName(tr("Insert Point"));
     setShortcut(QKeySequence(tr("I")));
-}
-
-void CreatePointObjectTool::mouseMovedWhileCreatingObject(const QPointF &pos,
-                                                          Qt::KeyboardModifiers modifiers)
-{
-    const MapRenderer *renderer = mapDocument()->renderer();
-
-    QPointF pixelCoords = renderer->screenToPixelCoords(pos);
-    SnapHelper(renderer, modifiers).snap(pixelCoords);
-
-    mNewMapObjectItem->mapObject()->setPosition(pixelCoords);
-    mNewMapObjectItem->syncWithMapObject();
-}
-
-void CreatePointObjectTool::mousePressedWhileCreatingObject(QGraphicsSceneMouseEvent *event)
-{
-    if (event->button() == Qt::RightButton)
-        cancelNewMapObject();
-}
-
-void CreatePointObjectTool::mouseReleasedWhileCreatingObject(QGraphicsSceneMouseEvent *event)
-{
-    if (event->button() == Qt::LeftButton)
-        finishNewMapObject();
 }
 
 MapObject *CreatePointObjectTool::createNewMapObject()
@@ -76,11 +62,4 @@ MapObject *CreatePointObjectTool::createNewMapObject()
     MapObject *newMapObject = new MapObject;
     newMapObject->setShape(MapObject::Point);
     return newMapObject;
-}
-
-bool CreatePointObjectTool::startNewMapObject(const QPointF &pos, ObjectGroup *objectGroup)
-{
-    if (!CreateObjectTool::startNewMapObject(pos, objectGroup))
-        return false;
-    return true;
 }

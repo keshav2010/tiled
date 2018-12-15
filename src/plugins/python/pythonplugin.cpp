@@ -46,6 +46,11 @@ PythonPlugin::PythonPlugin()
     mReloadTimer.setSingleShot(true);
     mReloadTimer.setInterval(1000);
 
+    connect(&mFileSystemWatcher, &QFileSystemWatcher::directoryChanged,
+            this, [this] { mReloadTimer.start(); });
+    connect(&mFileSystemWatcher, &QFileSystemWatcher::fileChanged,
+            this, [this] { mReloadTimer.start(); });
+
     connect(&mReloadTimer, &QTimer::timeout,
             this, &PythonPlugin::reloadModules);
 }
@@ -71,11 +76,13 @@ void PythonPlugin::initialize()
         Py_NoSiteFlag = 1;
         Py_NoUserSiteDirectory = 1;
 
+        PyImport_AppendInittab("tiled", PyInit_tiled);
+        PyImport_AppendInittab("tiled.qt", PyInit_tiled);
+        PyImport_AppendInittab("tiled.Tiled", PyInit_tiled);
         Py_Initialize();
-        inittiled();
 
-        // Get reference to base class to find its extensions later on
         PyObject *pmod = PyImport_ImportModule("tiled");
+
         if (pmod) {
             PyObject *tiledPlugin = PyObject_GetAttrString(pmod, "Plugin");
             Py_DECREF(pmod);
@@ -117,17 +124,13 @@ void PythonPlugin::initialize()
         PyRun_SimpleString(QString("import sys; sys.path.insert(0, \"%1\")")
                            .arg(mScriptDir).toUtf8().constData());
 
-        log(QString("-- Added %1 to path\n").arg(mScriptDir));
+        log(QString("Python scripts path: %1\n").arg(mScriptDir));
     }
 
     reloadModules();
 
-    if (QFile::exists(mScriptDir)) {
+    if (QFile::exists(mScriptDir))
         mFileSystemWatcher.addPath(mScriptDir);
-
-        connect(&mFileSystemWatcher, SIGNAL(directoryChanged(QString)),
-                &mReloadTimer, SLOT(start()));
-    }
 }
 
 void PythonPlugin::log(Tiled::LoggingInterface::OutputType type,
@@ -148,14 +151,22 @@ void PythonPlugin::reloadModules()
 {
     log(tr("Reloading Python scripts"));
 
+    // Remove any currently watched script files
+    const QStringList files = mFileSystemWatcher.files();
+    if (!files.isEmpty())
+        mFileSystemWatcher.removePaths(files);
+
     const QStringList pyfilter("*.py");
     QDirIterator iter(mScriptDir, pyfilter, QDir::Files | QDir::Readable);
+
+    QStringList filesToWatch;
 
     while (iter.hasNext()) {
         iter.next();
 
-        QString name = iter.fileInfo().baseName();
+        filesToWatch.append(iter.filePath());
 
+        const QString name = iter.fileInfo().baseName();
         ScriptEntry script = mScripts.take(name);
         script.name = name;
 
@@ -180,10 +191,13 @@ void PythonPlugin::reloadModules()
             }
         }
     }
+
+    if (!filesToWatch.isEmpty())
+        mFileSystemWatcher.addPaths(filesToWatch);
 }
 
 /**
- * Finds the first python class that extends tiled.Plugin
+ * Finds the first Python class that extends tiled.Plugin
  */
 PyObject *PythonPlugin::findPluginSubclass(PyObject *module)
 {
@@ -295,7 +309,7 @@ bool PythonMapFormat::write(const Tiled::Map *map, const QString &fileName)
 
     mPlugin.log(tr("-- Using script %1 to write %2").arg(mScriptFile, fileName));
 
-    PyObject *pmap = _wrap_convert_c2py__Tiled__Map_const(map);
+    PyObject *pmap = _wrap_convert_c2py__Tiled__Map_const___star__(&map);
     if (!pmap)
         return false;
     PyObject *pinst = PyObject_CallMethod(mClass,
@@ -353,7 +367,9 @@ QString PythonMapFormat::nameFilter() const
     if (!pinst) {
         PySys_WriteStderr("** Uncaught exception in script **\n");
     } else {
-        ret = PyString_AsString(pinst);
+        PyObject* pyStr = PyUnicode_AsEncodedString(pinst, "utf-8", "Error ~");
+        ret = PyBytes_AS_STRING(pyStr);
+        Py_XDECREF(pyStr);
         Py_DECREF(pinst);
     }
     handleError();
@@ -379,7 +395,9 @@ QString PythonMapFormat::shortName() const
     if (!pinst) {
         PySys_WriteStderr("** Uncaught exception in script **\n");
     } else {
-        ret = PyString_AsString(pinst);
+        PyObject* pyStr = PyUnicode_AsEncodedString(pinst, "utf-8", "Error ~");
+        ret = PyBytes_AS_STRING(pyStr);
+        Py_XDECREF(pyStr);
         Py_DECREF(pinst);
     }
     handleError();

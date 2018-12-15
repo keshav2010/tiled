@@ -33,11 +33,21 @@ CreateRectangleObjectTool::CreateRectangleObjectTool(QObject *parent)
     icon.addFile(QLatin1String(":images/48x48/insert-rectangle.png"));
     setIcon(icon);
     Utils::setThemeIcon(this, "insert-rectangle");
+<<<<<<< HEAD
     mToolInfo = tr("Place a rectangle by clicking-and-dragging in any direction. Holding <b>Shift</b> makes it square and holding <b>Ctrl</b> snaps its size to the tile size.");
     languageChanged();
+=======
+    languageChangedImpl();
+>>>>>>> 4a3496224dea749224cad47a5d0de3c7800a060d
 }
 
 void CreateRectangleObjectTool::languageChanged()
+{
+    CreateScalableObjectTool::languageChanged();
+    languageChangedImpl();
+}
+
+void CreateRectangleObjectTool::languageChangedImpl()
 {
     setName(tr("Insert Rectangle"));
     setShortcut(QKeySequence(tr("R")));

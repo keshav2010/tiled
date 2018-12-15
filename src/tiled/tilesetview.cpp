@@ -711,7 +711,7 @@ TilesetView::TilesetView(QWidget *parent)
     , mTerrain(nullptr)
     , mWangSet(nullptr)
     , mWangId(0)
-    , mWangColor(0)
+    , mWangColorIndex(0)
     , mHoveredCorner(0)
     , mTerrainChanged(false)
     , mWangIdChanged(false)
@@ -748,7 +748,7 @@ TilesetView::TilesetView(QWidget *parent)
     connect(StyleHelper::instance(), &StyleHelper::styleApplied,
             this, &TilesetView::updateBackgroundColor);
 
-    connect(mZoomable, SIGNAL(scaleChanged(qreal)), SLOT(adjustScale()));
+    connect(mZoomable, &Zoomable::scaleChanged, this, &TilesetView::adjustScale);
 }
 
 void TilesetView::setTilesetDocument(TilesetDocument *tilesetDocument)
@@ -934,7 +934,7 @@ void TilesetView::setWangSet(WangSet *wangSet)
 void TilesetView::setWangId(WangId wangId)
 {
     mWangBehavior = WholeId;
-    mWangColor = 0;
+    mWangColorIndex = 0;
 
     if (!mWangSet || wangId == mWangId)
         return;
@@ -956,7 +956,7 @@ void TilesetView::setWangEdgeColor(int color)
 
     Q_ASSERT(color <= mWangSet->edgeColorCount());
 
-    mWangColor = color;
+    mWangColorIndex = color;
 }
 
 void TilesetView::setWangCornerColor(int color)
@@ -968,7 +968,7 @@ void TilesetView::setWangCornerColor(int color)
 
     Q_ASSERT(color <= mWangSet->cornerColorCount());
 
-    mWangColor = color;
+    mWangColorIndex = color;
 }
 
 QIcon TilesetView::imageMissingIcon() const
@@ -1042,26 +1042,26 @@ void TilesetView::mouseMoveEvent(QMouseEvent *event)
             if (mWangBehavior == Edge) {
                 if (tileLocalPosF.x() < tileLocalPosF.y()) {
                     if (tileLocalPosF.x() > -tileLocalPosF.y())
-                        wangId.setEdgeColor(2, mWangColor);
+                        wangId.setEdgeColor(2, mWangColorIndex);
                     else
-                        wangId.setEdgeColor(3, mWangColor);
+                        wangId.setEdgeColor(3, mWangColorIndex);
                 } else {
                     if (tileLocalPosF.x() > -tileLocalPosF.y())
-                        wangId.setEdgeColor(1, mWangColor);
+                        wangId.setEdgeColor(1, mWangColorIndex);
                     else
-                        wangId.setEdgeColor(0, mWangColor);
+                        wangId.setEdgeColor(0, mWangColorIndex);
                 }
             } else {
                 if (tileLocalPosF.x() > 0) {
                     if (tileLocalPosF.y() > 0)
-                        wangId.setCornerColor(1, mWangColor);
+                        wangId.setCornerColor(1, mWangColorIndex);
                     else
-                        wangId.setCornerColor(0, mWangColor);
+                        wangId.setCornerColor(0, mWangColorIndex);
                 } else {
                     if (tileLocalPosF.y() > 0)
-                        wangId.setCornerColor(2, mWangColor);
+                        wangId.setCornerColor(2, mWangColorIndex);
                     else
-                        wangId.setCornerColor(3, mWangColor);
+                        wangId.setCornerColor(3, mWangColorIndex);
                 }
             }
         }
@@ -1089,7 +1089,6 @@ void TilesetView::mouseMoveEvent(QMouseEvent *event)
         const QModelIndex previousHoveredIndex = mHoveredIndex;
         mHoveredIndex = hoveredIndex;
         int previousHoverCorner = mHoveredCorner;
-        int hoveredCorner = 0;
 
         if (mHoveredIndex.isValid()) {
             const QPoint center = visualRect(hoveredIndex).center();
@@ -1097,6 +1096,7 @@ void TilesetView::mouseMoveEvent(QMouseEvent *event)
             const auto t = tilesetGridTransform(*tilesetDocument()->tileset(), center);
             const auto mappedPos = t.inverted().map(pos);
 
+            int hoveredCorner = 0;
             if (mappedPos.x() > center.x())
                 hoveredCorner += 1;
             if (mappedPos.y() > center.y())
@@ -1208,11 +1208,11 @@ void TilesetView::contextMenuEvent(QContextMenuEvent *event)
                                               QItemSelectionModel::Clear);
 
             QAction *addTerrain = menu.addAction(tr("Add Terrain Type"));
-            connect(addTerrain, SIGNAL(triggered()), SLOT(addTerrainType()));
+            connect(addTerrain, &QAction::triggered, this, &TilesetView::addTerrainType);
 
             if (mTerrain) {
                 QAction *setImage = menu.addAction(tr("Set Terrain Image"));
-                connect(setImage, SIGNAL(triggered()), SLOT(selectTerrainImage()));
+                connect(setImage, &QAction::triggered, this, &TilesetView::selectTerrainImage);
             }
         } else if (mEditWangSet) {
             selectionModel()->setCurrentIndex(index,
@@ -1221,18 +1221,17 @@ void TilesetView::contextMenuEvent(QContextMenuEvent *event)
 
             if (mWangSet) {
                 QAction *setImage = menu.addAction(tr("Set Wang Set Image"));
-                connect(setImage, SIGNAL(triggered()), SLOT(selectWangSetImage()));
+                connect(setImage, &QAction::triggered, this, &TilesetView::selectWangSetImage);
             }
-            if (mWangBehavior != WholeId && mWangColor) {
+            if (mWangBehavior != WholeId && mWangColorIndex) {
                 QAction *setImage = menu.addAction(tr("Set Wang Color Image"));
-                connect(setImage, SIGNAL(triggered()), SLOT(selectWangColorImage()));
+                connect(setImage, &QAction::triggered, this, &TilesetView::selectWangColorImage);
             }
         } else if (mTilesetDocument) {
             QAction *tileProperties = menu.addAction(propIcon,
                                                      tr("Tile &Properties..."));
             Utils::setThemeIcon(tileProperties, "document-properties");
-            connect(tileProperties, SIGNAL(triggered()),
-                    SLOT(editTileProperties()));
+            connect(tileProperties, &QAction::triggered, this, &TilesetView::editTileProperties);
         } else {
             // Assuming we're used in the MapEditor
 
@@ -1242,8 +1241,7 @@ void TilesetView::contextMenuEvent(QContextMenuEvent *event)
 
             QAction *swapTilesAction = menu.addAction(tr("&Swap Tiles"));
             swapTilesAction->setEnabled(exactlyTwoTilesSelected);
-            connect(swapTilesAction, SIGNAL(triggered()),
-                    SLOT(swapTiles()));
+            connect(swapTilesAction, &QAction::triggered, this, &TilesetView::swapTiles);
         }
 
         menu.addSeparator();
@@ -1254,8 +1252,8 @@ void TilesetView::contextMenuEvent(QContextMenuEvent *event)
     toggleGrid->setChecked(mDrawGrid);
 
     Preferences *prefs = Preferences::instance();
-    connect(toggleGrid, SIGNAL(toggled(bool)),
-            prefs, SLOT(setShowTilesetGrid(bool)));
+    connect(toggleGrid, &QAction::toggled,
+            prefs, &Preferences::setShowTilesetGrid);
 
     menu.exec(event->globalPos());
 }
@@ -1281,7 +1279,7 @@ void TilesetView::selectWangSetImage()
 void TilesetView::selectWangColorImage()
 {
     if (Tile *tile = currentTile())
-        emit wangColorImageSelected(tile, mWangBehavior == Edge, mWangColor);
+        emit wangColorImageSelected(tile, mWangBehavior == Edge, mWangColorIndex);
 }
 
 void TilesetView::editTileProperties()

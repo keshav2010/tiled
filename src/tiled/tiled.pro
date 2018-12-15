@@ -13,11 +13,7 @@ win32 {
     DESTDIR = ../../bin
 }
 
-QT += widgets
-
-contains(QT_CONFIG, opengl):!macx:!minQtVersion(5, 4, 0) {
-    QT += opengl
-}
+QT += widgets qml
 
 DEFINES += TILED_VERSION=$${TILED_VERSION}
 
@@ -131,11 +127,18 @@ SOURCES += aboutdialog.cpp \
     createtileobjecttool.cpp \
     document.cpp \
     documentmanager.cpp \
+    editableasset.cpp \
+    editablelayer.cpp \
+    editablemap.cpp \
+    editableselectedarea.cpp \
+    editabletilelayer.cpp \
+    editabletileset.cpp \
     editor.cpp \
     editpolygontool.cpp \
     eraser.cpp \
     erasetiles.cpp \
     exportasimagedialog.cpp \
+    exporthelper.cpp \
     filechangedwarning.cpp \
     fileedit.cpp \
     flexiblescrollbar.cpp \
@@ -172,6 +175,8 @@ SOURCES += aboutdialog.cpp \
     movemapobjecttogroup.cpp \
     moveterrain.cpp \
     newmapdialog.cpp \
+    newsbutton.cpp \
+    newsfeed.cpp \
     newtilesetdialog.cpp \
     noeditorwidget.cpp \
     objectgroupitem.cpp \
@@ -192,6 +197,7 @@ SOURCES += aboutdialog.cpp \
     propertiesdock.cpp \
     propertybrowser.cpp \
     raiselowerhelper.cpp \
+    regionvaluetype.cpp \
     renamelayer.cpp \
     renameterrain.cpp \
     renamewangset.cpp \
@@ -205,6 +211,8 @@ SOURCES += aboutdialog.cpp \
     resizetilelayer.cpp \
     reversingproxymodel.cpp \
     rotatemapobject.cpp \
+    scriptmanager.cpp \
+    scriptmodule.cpp \
     selectionrectangle.cpp \
     selectsametiletool.cpp \
     shapefilltool.cpp \
@@ -327,11 +335,18 @@ HEADERS += aboutdialog.h \
     createtileobjecttool.h \
     document.h \
     documentmanager.h \
+    editableasset.h \
+    editablelayer.h \
+    editablemap.h \
+    editableselectedarea.h \
+    editabletilelayer.h \
+    editabletileset.h \
     editor.h \
     editpolygontool.h \
     eraser.h \
     erasetiles.h \
     exportasimagedialog.h \
+    exporthelper.h \
     filechangedwarning.h \
     fileedit.h \
     flexiblescrollbar.h \
@@ -368,6 +383,8 @@ HEADERS += aboutdialog.h \
     movemapobjecttogroup.h \
     moveterrain.h \
     newmapdialog.h \
+    newsbutton.h \
+    newsfeed.h \
     newtilesetdialog.h \
     noeditorwidget.h \
     objectgroupitem.h \
@@ -390,6 +407,7 @@ HEADERS += aboutdialog.h \
     raiselowerhelper.h \
     randompicker.h \
     rangeset.h \
+    regionvaluetype.h \
     renamelayer.h \
     renameterrain.h \
     renamewangset.h \
@@ -403,6 +421,8 @@ HEADERS += aboutdialog.h \
     resizetilelayer.h \
     reversingproxymodel.h \
     rotatemapobject.h \
+    scriptmanager.h \
+    scriptmodule.h \
     selectionrectangle.h \
     selectsametiletool.h \
     shapefilltool.h \

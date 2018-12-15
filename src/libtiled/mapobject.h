@@ -43,18 +43,13 @@
 
 namespace Tiled {
 
+class MapRenderer;
 class ObjectGroup;
 class ObjectTemplate;
 class Tile;
 
 struct TILEDSHARED_EXPORT TextData
 {
-    enum FontAttributes {
-        FontFamily  = 0x1,
-        FontSize    = 0x2,
-        FontStyle   = 0x8
-    };
-
     TextData();
 
     QString text;
@@ -79,6 +74,8 @@ struct TILEDSHARED_EXPORT TextData
  */
 class TILEDSHARED_EXPORT MapObject : public Object
 {
+    Q_OBJECT
+
 public:
     /**
      * Enumerates the different object shapes. Rectangle is the default shape.
@@ -173,6 +170,7 @@ public:
 
     QRectF bounds() const;
     QRectF boundsUseTile() const;
+    QRectF screenBounds(const MapRenderer &renderer) const;
 
     const Cell &cell() const;
     void setCell(const Cell &cell);
@@ -208,6 +206,7 @@ public:
     const MapObject *templateObject() const;
 
     void syncWithTemplate();
+    void detachFromTemplate();
 
     bool isTemplateInstance() const;
 
@@ -490,10 +489,14 @@ inline MapObject::ChangedProperties MapObject::changedProperties() const
 
 inline void MapObject::setPropertyChanged(Property property, bool state)
 {
+#if QT_VERSION >= 0x050700
+    mChangedProperties.setFlag(property, state);
+#else
     if (state)
         mChangedProperties |= property;
     else
         mChangedProperties &= ~property;
+#endif
 }
 
 inline bool MapObject::propertyChanged(Property property) const

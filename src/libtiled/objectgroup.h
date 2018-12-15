@@ -30,8 +30,6 @@
 
 #pragma once
 
-#include "tiled_global.h"
-
 #include "layer.h"
 
 #include <QColor>
@@ -47,6 +45,8 @@ class MapObject;
  */
 class TILEDSHARED_EXPORT ObjectGroup : public Layer
 {
+    Q_OBJECT
+
 public:
     /**
      * Objects within an object group can either be drawn top down (sorted
@@ -157,8 +157,8 @@ public:
     void offsetObjects(const QPointF &offset, const QRectF &bounds,
                        bool wrapX, bool wrapY);
 
-    bool canMergeWith(Layer *other) const override;
-    Layer *mergedWith(Layer *other) const override;
+    bool canMergeWith(const Layer *other) const override;
+    Layer *mergedWith(const Layer *other) const override;
 
     const QColor &color() const;
     void setColor(const QColor &color);

@@ -95,6 +95,8 @@ protected:
     void mapDocumentChanged(MapDocument *oldDocument,
                             MapDocument *newDocument) override;
 
+    QList<Layer *> targetLayers() const override;
+
 private:
     enum PaintFlags {
         Mergeable = 0x1
@@ -153,7 +155,9 @@ private:
     bool mIsWangFill;
     WangSet *mWangSet;
 
+    bool mRandomCacheValid;
     void updateRandomList();
+    void invalidateRandomCache();
 
     StampActions *mStampActions;
 };
