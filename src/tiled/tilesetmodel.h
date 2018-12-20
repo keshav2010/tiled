@@ -28,7 +28,6 @@ namespace Tiled {
 class Tile;
 class Tileset;
 
-namespace Internal {
 
 /**
  * A model wrapping a tileset of a map. Used to display the tiles.
@@ -146,5 +145,4 @@ private:
     QMap<QString, int> mTileNames;
 };
 
-} // namespace Internal
 } // namespace Tiled

@@ -25,7 +25,8 @@
 #include <QObject>
 
 namespace Tiled {
-namespace Internal {
+
+class LoggingInterface;
 
 class EditableAsset;
 
@@ -40,11 +41,12 @@ class ScriptModule : public QObject
     Q_PROPERTY(QString platform READ platform)
     Q_PROPERTY(QString arch READ arch)
 
-    Q_PROPERTY(Tiled::Internal::EditableAsset *activeAsset READ activeAsset WRITE setActiveAsset NOTIFY activeAssetChanged)
+    Q_PROPERTY(Tiled::EditableAsset *activeAsset READ activeAsset WRITE setActiveAsset NOTIFY activeAssetChanged)
     Q_PROPERTY(QList<QObject*> openAssets READ openAssets)
 
 public:
     ScriptModule(QObject *parent = nullptr);
+    ~ScriptModule() override;
 
     QString version() const;
     QString platform() const;
@@ -56,16 +58,23 @@ public:
     QList<QObject*> openAssets() const;
 
 signals:
-    void assetCreated(Tiled::Internal::EditableAsset *asset);
-    void assetOpened(Tiled::Internal::EditableAsset *asset);
-    void assetAboutToBeSaved(Tiled::Internal::EditableAsset *asset);
-    void assetSaved(Tiled::Internal::EditableAsset *asset);
-    void assetAboutToBeClosed(Tiled::Internal::EditableAsset *asset);
+    void assetCreated(Tiled::EditableAsset *asset);
+    void assetOpened(Tiled::EditableAsset *asset);
+    void assetAboutToBeSaved(Tiled::EditableAsset *asset);
+    void assetSaved(Tiled::EditableAsset *asset);
+    void assetAboutToBeClosed(Tiled::EditableAsset *asset);
 
-    void activeAssetChanged(Tiled::Internal::EditableAsset *asset);
+    void activeAssetChanged(Tiled::EditableAsset *asset);
 
 public slots:
     void trigger(const QByteArray &actionName) const;
+
+    void alert(const QString &text, const QString &title = QString()) const;
+    bool confirm(const QString &text, const QString &title = QString()) const;
+    QString prompt(const QString &label, const QString &text = QString(), const QString &title = QString()) const;
+
+    void log(const QString &text) const;
+    void error(const QString &text) const;
 
 private slots:
     void documentCreated(Document *document);
@@ -75,10 +84,8 @@ private slots:
     void documentAboutToClose(Document *document);
     void currentDocumentChanged(Document *document);
 
-    void alert(const QString &text, const QString &title = QString()) const;
-    bool confirm(const QString &text, const QString &title = QString()) const;
-    QString prompt(const QString &label, const QString &text = QString(), const QString &title = QString()) const;
+private:
+    LoggingInterface *mLogger;
 };
 
-} // namespace Internal
 } // namespace Tiled

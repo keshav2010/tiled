@@ -25,9 +25,11 @@
 #include "mapdocument.h"
 
 namespace Tiled {
-namespace Internal {
+
+class MapObject;
 
 class EditableLayer;
+class EditableMapObject;
 
 class EditableMap : public EditableAsset
 {
@@ -46,12 +48,13 @@ class EditableMap : public EditableAsset
     Q_PROPERTY(Tiled::Map::RenderOrder renderOrder READ renderOrder WRITE setRenderOrder)
     Q_PROPERTY(QColor backgroundColor READ backgroundColor WRITE setBackgroundColor)
     Q_PROPERTY(Tiled::Map::LayerDataFormat layerDataFormat READ layerDataFormat WRITE setLayerDataFormat)
-    Q_PROPERTY(Tiled::Internal::EditableSelectedArea *selectedArea READ selectedArea CONSTANT)
+    Q_PROPERTY(Tiled::EditableSelectedArea *selectedArea READ selectedArea CONSTANT)
     Q_PROPERTY(int layerCount READ layerCount)
 
 public:
     explicit EditableMap(MapDocument *mapDocument,
                          QObject *parent = nullptr);
+    ~EditableMap() override;
 
     QString fileName() const override;
 
@@ -69,8 +72,11 @@ public:
     QColor backgroundColor() const;
     Map::LayerDataFormat layerDataFormat() const;
     int layerCount() const;
-    Q_INVOKABLE Tiled::Internal::EditableLayer *layerAt(int index);
+    Q_INVOKABLE Tiled::EditableLayer *layerAt(int index);
     Q_INVOKABLE void removeLayerAt(int index);
+    Q_INVOKABLE void removeLayer(Tiled::EditableLayer *editableLayer);
+    Q_INVOKABLE void insertLayerAt(int index, Tiled::EditableLayer *editableLayer);
+    Q_INVOKABLE void addLayer(Tiled::EditableLayer *editableLayer);
 
     void setTileWidth(int value);
     void setTileHeight(int value);
@@ -96,13 +102,25 @@ public slots:
                 const QPoint &offset = QPoint(),
                 bool removeObjects = false);
 
+private slots:
+    void detachEditableLayer(Layer *layer);
+    void detachMapObjects(const QList<MapObject*> &mapObjects);
+
 private:
+    friend class EditableLayer;
+    friend class EditableMapObject;
+    friend class EditableObjectGroup;
+
+    EditableLayer *editableLayer(Layer *layer);
+    EditableMapObject *editableMapObject(MapObject *mapObject);
+
     Map *map() const;
     MapRenderer *renderer() const;
 
     MapDocument * const mMapDocument;
 
     QHash<Layer*, EditableLayer*> mEditableLayers;
+    QHash<MapObject*, EditableMapObject*> mEditableMapObjects;
     EditableSelectedArea mSelectedArea;
 };
 
@@ -197,7 +215,6 @@ inline EditableSelectedArea *EditableMap::selectedArea()
     return &mSelectedArea;
 }
 
-} // namespace Internal
 } // namespace Tiled
 
-Q_DECLARE_METATYPE(Tiled::Internal::EditableMap*)
+Q_DECLARE_METATYPE(Tiled::EditableMap*)

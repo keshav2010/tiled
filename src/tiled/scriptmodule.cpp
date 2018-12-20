@@ -22,6 +22,7 @@
 
 #include "actionmanager.h"
 #include "editableasset.h"
+#include "logginginterface.h"
 
 #include <QAction>
 #include <QCoreApplication>
@@ -29,10 +30,10 @@
 #include <QMessageBox>
 
 namespace Tiled {
-namespace Internal {
 
 ScriptModule::ScriptModule(QObject *parent)
     : QObject(parent)
+    , mLogger(new LoggingInterface(this))
 {
     auto documentManager = DocumentManager::instance();
     connect(documentManager, &DocumentManager::documentCreated, this, &ScriptModule::documentCreated);
@@ -41,6 +42,13 @@ ScriptModule::ScriptModule(QObject *parent)
     connect(documentManager, &DocumentManager::documentSaved, this, &ScriptModule::documentSaved);
     connect(documentManager, &DocumentManager::documentAboutToClose, this, &ScriptModule::documentAboutToClose);
     connect(documentManager, &DocumentManager::currentDocumentChanged, this, &ScriptModule::currentDocumentChanged);
+
+    PluginManager::addObject(mLogger);
+}
+
+ScriptModule::~ScriptModule()
+{
+    PluginManager::removeObject(mLogger);
 }
 
 QString ScriptModule::version() const
@@ -106,14 +114,39 @@ void ScriptModule::trigger(const QByteArray &actionName) const
         action->trigger();
 }
 
-void ScriptModule::documentOpened(Document *document)
+void ScriptModule::alert(const QString &text, const QString &title) const
 {
-    emit assetOpened(document->editable());
+    QMessageBox::warning(nullptr, title, text);
+}
+
+bool ScriptModule::confirm(const QString &text, const QString &title) const
+{
+    return QMessageBox::question(nullptr, title, text) == QMessageBox::Yes;
+}
+
+QString ScriptModule::prompt(const QString &label, const QString &text, const QString &title) const
+{
+    return QInputDialog::getText(nullptr, title, label, QLineEdit::Normal, text);
+}
+
+void ScriptModule::log(const QString &text) const
+{
+    mLogger->info(text);
+}
+
+void ScriptModule::error(const QString &text) const
+{
+    mLogger->error(tr("Error: %1").arg(text));
 }
 
 void ScriptModule::documentCreated(Document *document)
 {
     emit assetCreated(document->editable());
+}
+
+void ScriptModule::documentOpened(Document *document)
+{
+    emit assetOpened(document->editable());
 }
 
 void ScriptModule::documentAboutToBeSaved(Document *document)
@@ -136,20 +169,4 @@ void ScriptModule::currentDocumentChanged(Document *document)
     emit activeAssetChanged(document ? document->editable() : nullptr);
 }
 
-void ScriptModule::alert(const QString &text, const QString &title) const
-{
-    QMessageBox::warning(nullptr, title, text);
-}
-
-bool ScriptModule::confirm(const QString &text, const QString &title) const
-{
-    return QMessageBox::question(nullptr, title, text) == QMessageBox::Yes;
-}
-
-QString ScriptModule::prompt(const QString &label, const QString &text, const QString &title) const
-{
-    return QInputDialog::getText(nullptr, title, label, QLineEdit::Normal, text);
-}
-
-} // namespace Internal
 } // namespace Tiled
