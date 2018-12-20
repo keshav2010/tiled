@@ -28,7 +28,6 @@
 #include "utils.h"
 
 namespace Tiled {
-namespace Internal {
 
 CreateTextObjectTool::CreateTextObjectTool(QObject *parent)
     : CreateObjectTool(parent)
@@ -37,12 +36,7 @@ CreateTextObjectTool::CreateTextObjectTool(QObject *parent)
     icon.addFile(QLatin1String(":images/48x48/insert-text.png"));
     setIcon(icon);
     Utils::setThemeIcon(this, "insert-text");
-<<<<<<< HEAD
-    mToolInfo = tr("<b>Click</b> anywhere on the map to insert text. You can also hold <b>Left mouse button</b> to see default text while placing it on the map, release <b>Left mouse button</b> to place text on the map.");
-    languageChanged();
-=======
     languageChangedImpl();
->>>>>>> 4a3496224dea749224cad47a5d0de3c7800a060d
 }
 
 void CreateTextObjectTool::mouseMovedWhileCreatingObject(const QPointF &pos, Qt::KeyboardModifiers modifiers)
@@ -83,5 +77,4 @@ MapObject *CreateTextObjectTool::createNewMapObject()
     return newMapObject;
 }
 
-} // namespace Internal
 } // namespace Tiled

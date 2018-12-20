@@ -24,7 +24,6 @@
 #include "utils.h"
 
 using namespace Tiled;
-using namespace Tiled::Internal;
 
 CreateEllipseObjectTool::CreateEllipseObjectTool(QObject *parent)
     : CreateScalableObjectTool(parent)
@@ -33,12 +32,7 @@ CreateEllipseObjectTool::CreateEllipseObjectTool(QObject *parent)
     icon.addFile(QLatin1String(":images/48x48/insert-ellipse.png"));
     setIcon(icon);
     Utils::setThemeIcon(this, "insert-ellipse");
-<<<<<<< HEAD
-    mToolInfo = tr("Place an ellipse by clicking-and-dragging in any direction. Holding <b>Shift</b> makes it circle and holding <b>Ctrl</b> snaps its size to the tile size.");
-    languageChanged();
-=======
     languageChangedImpl();
->>>>>>> 4a3496224dea749224cad47a5d0de3c7800a060d
 }
 
 void CreateEllipseObjectTool::languageChanged()

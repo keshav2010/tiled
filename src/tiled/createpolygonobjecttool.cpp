@@ -46,7 +46,6 @@
 #include "qtcompat_p.h"
 
 using namespace Tiled;
-using namespace Tiled::Internal;
 
 CreatePolygonObjectTool::CreatePolygonObjectTool(QObject *parent)
     : CreateObjectTool(parent)
@@ -67,16 +66,7 @@ CreatePolygonObjectTool::CreatePolygonObjectTool(QObject *parent)
     icon.addFile(QLatin1String(":images/48x48/insert-polygon.png"));
     setIcon(icon);
 
-<<<<<<< HEAD
-    mToolInfo = tr("<b>First Click</b> determines the location of object and first point of polygon. <b>Right Click</b> or press <b>Enter</b> to finish creating polygon. press <b>Escape</b> to cancel creation of polygon.");
-
-
-    mToolInfo = tr("<b>First Click</b> determines the location of object and first point of polygon. <b>Right Click</b> or press <b>Enter</b> to finish creating polygon. press <b>Escape</b> to cancel creation of polygon.");
-
-    languageChanged();
-=======
     languageChangedImpl();
->>>>>>> 4a3496224dea749224cad47a5d0de3c7800a060d
 }
 
 CreatePolygonObjectTool::~CreatePolygonObjectTool()

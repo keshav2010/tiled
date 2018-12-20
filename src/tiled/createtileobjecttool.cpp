@@ -29,7 +29,6 @@
 #include "utils.h"
 
 using namespace Tiled;
-using namespace Tiled::Internal;
 
 CreateTileObjectTool::CreateTileObjectTool(QObject *parent)
     : CreateObjectTool(parent)
@@ -38,12 +37,7 @@ CreateTileObjectTool::CreateTileObjectTool(QObject *parent)
     icon.addFile(QLatin1String(":images/48x48/insert-image.png"));
     setIcon(icon);
     Utils::setThemeIcon(this, "insert-image");
-<<<<<<< HEAD
-    mToolInfo = tr("First select the tile to place in the Tilesets view. Hold <b>Left mouse button</b> on the map to move the object and release it to place object. Holding <b>Ctrl</b> snaps the object to grid.");
-    languageChanged();
-=======
     languageChangedImpl();
->>>>>>> 4a3496224dea749224cad47a5d0de3c7800a060d
 }
 
 void CreateTileObjectTool::mouseMovedWhileCreatingObject(const QPointF &pos, Qt::KeyboardModifiers modifiers)

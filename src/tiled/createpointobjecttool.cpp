@@ -28,7 +28,6 @@
 #include "utils.h"
 
 using namespace Tiled;
-using namespace Tiled::Internal;
 
 CreatePointObjectTool::CreatePointObjectTool(QObject *parent)
     : CreateObjectTool(parent)
@@ -37,12 +36,7 @@ CreatePointObjectTool::CreatePointObjectTool(QObject *parent)
     icon.addFile(QLatin1String(":images/48x48/insert-point.png"));
     setIcon(icon);
     Utils::setThemeIcon(this, "insert-point");
-<<<<<<< HEAD
-    mToolInfo = tr("<b>Click</b> on the map to position a point object.");
-    languageChanged();
-=======
     languageChangedImpl();
->>>>>>> 4a3496224dea749224cad47a5d0de3c7800a060d
 }
 
 void CreatePointObjectTool::languageChanged()
